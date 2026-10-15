@@ -1,0 +1,22 @@
+{
+  "baseline": "exact-objective-lexicon",
+  "results": {
+    "train": {
+      "intent_tv": 0.0,
+      "intent_cosine": 1.0
+    },
+    "test": {
+      "intent_tv": 0.0,
+      "intent_cosine": 1.0
+    },
+    "composition": {
+      "intent_tv": 0.0,
+      "intent_cosine": 1.0000001192092896
+    }
+  },
+  "source_sha256": {
+    "scripts/audit_intents.py": "dc669e7d8fd636fd3005d19ef33ea5a9f6dbb615940f250ad648158ca83d9d7c",
+    "src/mr_nwm/rules.py": "15b1968d65ddadc47df39ddcc20f5f7d088536c82a186e35a8a486e3845f45b1"
+  },
+  "note": "Only the benchmark grammar; no open-language capability implied."
+}

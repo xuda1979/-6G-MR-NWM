@@ -1,0 +1,33 @@
+{
+  "kind": "pretrained-integration-only",
+  "pretrained": {
+    "model": "Qwen/Qwen2.5-0.5B",
+    "requested_revision": "060db6499f32faf8b98477b0a26969ef7d8b9987",
+    "resolved_revision": "060db6499f32faf8b98477b0a26969ef7d8b9987"
+  },
+  "language_parameters": 494032768,
+  "trainable_parameters": 934553,
+  "modalities": [
+    "csi",
+    "iq",
+    "topology"
+  ],
+  "forecast_shape": [
+    1,
+    5,
+    6
+  ],
+  "numeric_adapter_gradient_norm": 0.006621313281357288,
+  "preference_invariance": true,
+  "frozen_language_weights": true,
+  "elapsed_seconds_including_loading": 5.1315880399997695,
+  "python": "3.12.14",
+  "torch": "2.5.1+cpu",
+  "device": "cpu",
+  "source_sha256": {
+    "src/mr_nwm/foundation.py": "d8c68b3ef6b73b64a038664531ff644e718c5b2139325aa887bed9ea2e38c0e6",
+    "src/mr_nwm/modalities.py": "45dfa77c34d6c06662e058d5410b44c338eeedb60dca1fe732ec6bee9ac26d96",
+    "scripts/pretrained_demo.py": "52ccc9fa6c5bcbba254c92d41f369f89cc4025de6bb79df27a3cb2f90fc94251"
+  },
+  "limitation": "Random numeric adapters and prediction heads; no RAN performance evaluation."
+}

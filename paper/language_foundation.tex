@@ -1,0 +1,168 @@
+\section{Language-Model-Centered Multimodal Architecture}
+\subsection{Foundation and modality-specific encoders}
+The full MR-NWM design uses a \emph{pretrained language transformer as the shared
+slow backbone}. Continuous observations enter this backbone through trainable
+modality adapters rather than being converted into strings. A separate fast
+physical subnetwork performs the repeated numeric transitions between backbone
+updates. This separation preserves a language-based foundation while assigning
+high-frequency prediction to a smaller computational path.
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[font=\small,>=Latex,
+ box/.style={draw=black!60,rounded corners=2pt,align=center,minimum height=0.9cm},
+ arr/.style={->,thick}]
+ \node[box,fill=blue!7,text width=3.3cm] (intent) at (0,2.3)
+ {Operational preference text};
+ \node[box,fill=green!7,text width=3.3cm] (modal) at (0,0)
+ {CSI / IQ / KPIs / topology\\Modality encoders\\Age, period, validity};
+ \node[box,fill=green!7,text width=3.3cm] (evidence) at (0,-2.3)
+ {Observed state and context\\Validated exogenous evidence};
+ \node[box,fill=violet!9,text width=3.4cm,minimum height=3.1cm] (lm) at (5,0)
+ {\textbf{Shared pretrained\\language transformer}\\[0.15cm]
+ Physical view:\\observations + evidence\\[0.1cm]
+ Semantic view:\\context + intent};
+ \node[box,fill=orange!10,text width=3.5cm] (packet) at (10,1.5)
+ {Context projection\\Cached FiLM / low-rank packet};
+ \node[box,fill=orange!10,text width=3.5cm] (fast) at (10,-0.2)
+ {Fast recurrent physics\\State, action, memory\\$K$ steps per slow refresh};
+ \node[box,fill=blue!7,text width=3.4cm] (weights) at (5,-2.7)
+ {Structured objective weights};
+ \node[box,fill=orange!10,text width=3.5cm] (states) at (10,-2.2)
+ {Continuous state trajectory\\Summary to next slow update};
+ \draw[arr] (intent.east) -- (lm.north west);
+ \draw[arr] (modal.east) -- (lm.west);
+ \draw[arr] (evidence.east) -- (lm.south west);
+ \draw[arr] (lm.north east) -- (packet.west);
+ \draw[arr] (packet) -- (fast);
+ \draw[arr] (fast) -- (states);
+ \draw[arr] (lm.south) -- (weights.north);
+\end{tikzpicture}
+\caption{Language-centered architecture implemented by the foundation path. The
+language transformer is the shared slow backbone; two separate views enforce the
+preference/evidence boundary. Modality adapters and wireless heads require task
+training. Fast predictions use the cached packet without calling the language model.}
+\label{fig:language-foundation}
+\end{figure*}
+
+Let $x_T^{(m)}$ be observations of modality $m$, $v_T^{(m)}$ their validity mask,
+$\delta_T^{(m)}$ their observation ages, and $\rho_m$ the acquisition period.
+A modality encoder creates continuous tokens
+\begin{equation}
+ e_T^{(m)}=E_m(x_T^{(m)})+e_{\rm type}^{(m)}
+       +E_{\rm time}[\log(1+\delta_T^{(m)}),\log(1+\rho_m)].
+\end{equation}
+The implementation supports variable token counts, explicitly masked missing
+observations, and an input-token budget. A modality can be absent entirely.
+Negative ages, non-finite valid measurements, and malformed masks are rejected.
+These checks make the temporal information explicit; they are not a distributed
+clock-synchronization or missing-data recovery system.
+
+\begin{table*}[t]
+\centering\small
+\caption{Multimodal inputs in the language-foundation integration. Front ends are
+trainable adapters; their radio representations require task-specific data and alignment.}
+\begin{tabular}{p{0.16\textwidth}p{0.35\textwidth}p{0.40\textwidth}}
+\toprule
+Input & Representation entering the model & Implemented boundary and limitations\\
+\midrule
+Intent, protocol/evidence text & Language tokenizer IDs and masks & Preferences and exogenous evidence use separate typed fields.\\
+State, traffic, KPIs & Continuous vectors or sequences & Numeric projections preserve values; timestamps and acquisition periods are supplied by the caller.\\
+CSI and IQ & Continuous tokens with real/imaginary feature pairs & Linear/MLP adapters; complex preprocessing and RF calibration are external.\\
+Topology & Node features and optional adjacency & One normalized graph message-passing step before language-backbone fusion.\\
+Visual/map features & Continuous patch feature vectors & Configurable numeric patch adapter; raw-image patch extraction is external.\\
+\bottomrule
+\end{tabular}
+\label{tab:modalities}
+\end{table*}
+
+For graph inputs, an optional normalized adjacency operator mixes neighboring
+node embeddings before fusion. For CSI/IQ, the caller supplies explicit real
+and imaginary components with known dimensions. Image or map patches can use
+the same registered-adapter interface, but this release does not include a
+pretrained vision encoder or raw-camera pipeline. Adapter presence alone does
+not establish useful cross-modal alignment. That alignment must be learned and
+tested on synchronized observation/action trajectories.
+
+\subsection{Two views of one language backbone}
+Physical predictions must be able to use information about the external world
+without confusing it with the operator's preferences. The same pretrained
+transformer $F_\theta$ therefore processes two separate input views. Let
+\begin{equation}
+ Z_T^p=[E_s(s_{T,0});E_c(c_T);E_H(H_{T-1});
+                  \{e_T^{(m)}\}_m;E_K(K_T)],
+\end{equation}
+where $K_T$ contains externally supplied, validated evidence, such as an actual
+configuration change. A learned query $q_p$ reads the physical view, while
+intent tokens are appended only to the semantic view:
+\begin{align}
+ h_T^p&=P_pF_\theta([Z_T^p;q_p])_{\rm last},\\
+ h_T^I&=P_IF_\theta([Z_T^p;E_I(I_T)])_{\rm last\ valid}.
+\end{align}
+Both views use the \emph{same language-model parameters}, with independent
+forward passes and masks. Preferences cannot enter the physical forward pass
+through attention or hidden-state reuse. By contrast, changes to observed
+modalities or exogenous evidence may legitimately change predicted dynamics.
+The caller is responsible for distinguishing a requested change from a change
+that has actually been applied or externally observed.
+
+The projected physical context passes through the recurrent physics expert and
+then generates the fast-tier FiLM/low-rank packet. The physics expert can share
+its parameters with the fast recurrence. This is a coupling around the language
+trunk; the code does not claim to have converted the pretrained transformer's
+internal feed-forward layers into wireless SSM experts. The objective head
+uses $h_T^I$. Continuous state and structured objective heads are implemented;
+general natural-language explanations and arbitrary protocol action decoders
+remain additional output heads to develop and evaluate.
+
+The \texttt{LanguageBasedWorldModel.from\_pretrained} entry point loads an actual
+Hugging Face transformer checkpoint. A concrete small example is
+\texttt{Qwen/Qwen2.5-0.5B} \cite{qwen2024}. Pretrained weights can be frozen while
+gradients still propagate \emph{through} the transformer into numeric adapters.
+Disabling autograd around the frozen trunk would break that training path and
+is deliberately avoided. The numeric adapters, context projections, modulation
+heads, and dynamics predictor start untrained; pretrained text weights do not
+automatically provide a calibrated wireless world model.
+
+\subsection{Multiple observation rates and execution rates}
+The architecture distinguishes three quantities: each modality's acquisition
+period $\rho_m$, the slow backbone's refresh interval $\Delta T$, and the fast
+predictor's step interval $\Delta t$, with $\Delta T=K\Delta t$ in the basic
+training graph. Observation tokens retain their own ages and periods even when
+combined at one slow refresh. A token budget requires explicit pooling or
+resampling before excessively long streams enter the language backbone.
+
+Only two learned execution rates are implemented: one language-backbone update
+per macro window and $K$ lightweight recurrent steps. Operator-level knowledge
+retrieval, long-horizon task decomposition, and model lifecycle management can
+run at a still slower external rate, but are not a third implemented neural
+controller in this release. The fast API does not call the language backbone;
+the contract tests count backbone calls to enforce this property.
+
+Placement in Non-RT management, a Near-RT application, or an in-node predictor
+depends on measured end-to-end budgets. No general language-model size or Python
+module name establishes that placement. In particular, the language-foundation
+version's latency must be measured separately from the lightweight prototype's
+timing table. RF/CSI sampling, tensor fusion, model inference, network transport,
+and actuator execution contribute different parts of the overall budget.
+
+\subsection{What the two code paths establish}
+The \texttt{foundation.py} path implements the intended language-centered
+architecture and registered multimodal token adapters. Its tests cover causal
+preference separation, graph/missing-data handling, input ages, frozen-trunk
+gradient flow, and cached fast execution. The optional integration script records
+the checkpoint identity and resolved revision. We executed this check with
+Qwen2.5-0.5B on CPU, loading 494,032,768 pretrained backbone parameters and
+connecting CSI, IQ, and topology feature tokens. The five-step output had shape
+$1\times5\times6$; numeric-adapter gradients were nonzero with frozen backbone
+weights, and preference changes left physical predictions unchanged. The record
+is stored in \texttt{pretrained\_integration.json}. This establishes
+software/gradient compatibility rather than a trained RAN model or a general
+language-understanding score.
+
+The following lightweight variant replaces the expensive language trunk with
+small train-from-scratch attention/MLP components. Its controlled experiments
+isolate recurrent dynamics, sharing, and modulation at low cost. The numerical
+results later in this paper belong \emph{only} to that lightweight variant.
+They are not evaluations of Qwen or evidence that language pretraining improves
+wireless prediction.

@@ -1,0 +1,55 @@
+Table~\ref{tab:results} reports measurements from the fixed protocol. The
+shared model reaches $-22.24\pm0.20$~dB on held-out IID trajectories, compared
+with $-14.92\pm0.35$~dB for the approximately parameter-matched MLP and
+$-21.19\pm0.30$~dB for the standalone recurrent model. Thus recurrence is a
+strong alternative to the extra slow tier in this example. The shared model
+has 28,031 parameters, whereas the standalone recurrent control has 5,398.
+The latter should remain a serious baseline when a slow semantic/context tier
+is not otherwise required by the application.
+
+Under the joint traffic, coupling, and mobility shift, the shared predictor's
+NMSE degrades to $-9.58\pm0.41$~dB. The standalone recurrent model reaches
+$-9.43\pm0.37$~dB. This small difference does not establish a robust
+out-of-distribution benefit from the nested hierarchy. Persistence is also
+competitive with the smaller MLP under this shift, illustrating that training
+accuracy alone is an inadequate model-selection argument for deployment.
+
+Sharing changes the IID mean only modestly relative to the unshared model,
+whose three-seed variability is substantially larger. Removing modulation
+reduces IID accuracy, but its OOD mean is close to the full model. Most
+importantly, the correct bridge comparison---unshared joint versus unshared
+detached---does not establish a consistent advantage for cross-scale gradients
+across IID and OOD conditions. The experiment therefore supports the feasibility
+of the training graph and APIs, rather than a general superiority claim for
+each proposed coupling.
+
+The paired action-effect NMSE for the shared model is
+$-11.75\pm0.27$~dB, below the action-ignorant persistence control's 0~dB.
+This provides a direct check that the learned predictor uses candidate actions.
+It does not by itself establish an intervention effect in a real radio system;
+the comparison is against the explicitly intervenable synthetic simulator.
+
+Table~\ref{tab:intent} also reveals substantial parsing error despite the small
+controlled vocabulary. The shared model's mean TV increases from 0.118 for
+held-out wording to 0.195 for the unseen three-objective combination. An
+additional exact lexicon compiler achieves zero TV on all of these restricted
+grammar splits, as recorded in \texttt{intent\_baseline.json}. That control
+requires no neural training and makes clear that the present language task
+does not justify using a pretrained language model. The learned head is a
+demonstration of differentiable intent compilation whose robustness needs
+improvement and evaluation on a less artificial corpus.
+
+The shared model's finite-candidate IID regret is
+$0.0055\pm0.0022$ in normalized utility units. All selected candidates satisfy
+the configured power budget because infeasible candidates are removed before
+ranking. Small regret on this short candidate list should not be confused with
+high long-run policy return or learned constraint satisfaction.
+
+On the measured CPU host (Python 3.12.14, PyTorch 2.5.1 CPU, one PyTorch thread),
+the shared model's mean per-run fast p50 is approximately 0.081~ms and its mean
+per-run fast p99 is approximately 0.291~ms. The slow p50 is approximately
+0.591~ms. These are measurements of a tiny eager-mode model, with the fast
+packet already cached. They are neither a comparison with foundation-model
+inference nor a worst-case deadline guarantee. Raw timing samples and
+per-initialization quantiles are preserved, so the host-specific observation
+can be checked without treating it as a deployed baseband result.
