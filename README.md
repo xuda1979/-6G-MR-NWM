@@ -1,0 +1,193 @@
+# 6G-MR-NWM
+
+**Language-Model-Centered World Models for Multimodal, Multi-Rate RAN Control**
+
+The intended architecture uses a **pretrained language transformer as the slow
+shared multimodal backbone**, plus continuous modality encoders and a cached
+fast recurrent physics subnetwork. The project also preserves the smaller
+train-from-scratch reference model used for the reproducible synthetic benchmark.
+Authors are blank in the manuscript and PDF metadata.
+
+[Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
+[Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
+[Reproduction protocol](docs/REPRODUCIBILITY.md)
+
+## Research status
+
+There are two explicit code paths:
+
+| Path | Backbone | Evidence |
+|---|---|---|
+| `LanguageBasedWorldModel` in `foundation.py` | External pretrained language transformer and tokenizer | Multimodal, gradient, causality and API integration checks; no trained RAN performance claim |
+| `MultiRateNestedWorldModel` in `model.py` | Small randomly initialized attention/MLP mixture | Committed three-seed, eight-variant two-link synthetic benchmark |
+
+The published benchmark numbers belong **only to the lightweight reference path**.
+No measured radio data or deployed RIC/DU is included. A pretrained text model
+still needs numeric-adapter alignment and wireless task training. Radio deadlines
+must be measured on the target system.
+
+See [language-foundation inputs and timescales](docs/LANGUAGE_FOUNDATION.md).
+
+## What is implemented
+
+- A real pretrained language-model integration with numeric modality adapters,
+  two causal views of one shared language backbone, and a cached fast subnetwork.
+- A dense mixture of semantic MLP and gated recurrent physics operators, with
+  optional identity sharing of slow/fast physics parameters.
+- Numeric state/context encoders, explicit state memory, FiLM, and context-generated
+  low-rank residual updates. Every expert runs; this is not sparse MoE acceleration.
+- A causal information boundary: preferences change utility weights, while physical
+  predictions at fixed actions and exogenous context are invariant to preferences.
+- Free-running forecasts across two or more consecutive macro windows, with
+  terminal-state advancement, a strided feedback summary, and truncated BPTT.
+- Supervised parsing of throughput/latency/energy phrases into objective weights,
+  held-out wording, and a held-out three-objective combination. An exact lexicon
+  compiler provides a strong control for this restricted grammar.
+- Eight executable variants: shared, unshared, no modulation, detached bridge,
+  residual MLP, parameter-matched MLP, standalone recurrent model, and persistence.
+- Signal-energy NMSE, per-feature and per-horizon errors, paired action-effect
+  accuracy, intent TV/cosine, constrained finite-candidate regret, and synchronized
+  latency p50/p95/p99 with retained raw samples.
+- An optional action-conditioned flow-matching head with explicit Gaussian-base
+  sampling. It is **disabled in the reported benchmark** and does not modify the
+  deterministic fast rollout.
+
+```mermaid
+flowchart TD
+    subgraph L["Shared pretrained language backbone — slow rate"]
+        S[Semantic view and objective head]
+        P[Physical view and context projection]
+    end
+    I[Preference text] --> S
+    C[Continuous modalities and measured context] --> P
+    C --> S
+    P --> M[FiLM and low-rank packet]
+    M --> F[Fast recurrent dynamics]
+    A[Candidate actions] --> F
+    F --> H[Next-window state and summary]
+    H --> P
+    S --> U[Utility and feasible-candidate audit]
+    F --> U
+```
+
+The slow/fast split is a computational API. It is not an implemented distributed
+transport or asynchronous scheduler. See [deployment requirements](docs/DEPLOYMENT.md).
+
+## Pretrained language foundation and multimodal inputs
+
+```bash
+python -m pip install -e '.[foundation]'
+python scripts/pretrained_demo.py --model Qwen/Qwen2.5-0.5B
+```
+
+This downloads external model weights; they are not bundled. The demo checks
+integration with randomly initialized numeric adapters/heads, rather than training
+a RAN predictor. CSI/IQ use real/imaginary features, graph tokens can include an
+adjacency matrix, and each modality carries its own age, period and validity mask.
+The fast tier calls no language model. For the detailed API and training boundary,
+see [LANGUAGE_FOUNDATION.md](docs/LANGUAGE_FOUNDATION.md).
+
+The [recorded integration check](results/pretrained_integration.json) actually loaded
+Qwen2.5-0.5B revision `060db6499f32faf8b98477b0a26969ef7d8b9987` on CPU and
+verified numeric-adapter gradients and preference invariance. Its adapters and
+wireless heads are untrained; this is not a RAN accuracy benchmark.
+
+## Quick start
+
+Python 3.10+; the reference run used Python 3.12 and PyTorch 2.5.1 CPU.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e '.[dev,paper]'
+make test lint smoke
+```
+
+Run the full fixed-budget experiment (300 updates, three seeds, eight variants):
+
+```bash
+make reproduce
+# Outputs go to runs/reference, preserving the committed reference evidence.
+python scripts/summarize.py runs/reference/metrics.json
+```
+
+Re-evaluate the committed final checkpoints without retraining:
+
+```bash
+make verify
+```
+
+Regenerate committed tables/figures and build the paper with a TeX installation:
+
+```bash
+make report
+make paper
+```
+
+The summary script writes generated tables and figures from the selected metrics.
+To return to the committed reference report after a new run, use `make report`.
+
+## Using the model
+
+```python
+from mr_nwm import ModelConfig, MultiRateNestedWorldModel
+from mr_nwm.data import generate_batch
+
+model = MultiRateNestedWorldModel(ModelConfig(horizon=5)).eval()
+batch = generate_batch(size=2, steps=10, seed=123)
+trajectory = model.rollout(batch.intents, batch.initial, batch.actions, batch.context)
+assert trajectory.shape == (2, 10, 6)
+
+# Split execution: cache the packet and retain memory during a macro window.
+packet = model.forward_slow_tier(batch.intents, batch.initial, batch.context)
+state, memory = batch.initial, None
+for action in batch.actions[:, :5].unbind(1):
+    state, hidden, memory = model.forward_fast_tier_step(state, action, packet, memory)
+```
+
+This example initializes an untrained model. The committed checkpoints are loaded
+and checked by `scripts/verify_results.py`.
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `src/mr_nwm/foundation.py` | Pretrained language-centered slow backbone and fast API |
+| `src/mr_nwm/modalities.py` | Continuous tokens, time/validity masks, and graph messages |
+| `src/mr_nwm/model.py` | Lightweight reference model and shared multi-rate execution API |
+| `src/mr_nwm/experts.py` | Causal mixture and recurrent core |
+| `src/mr_nwm/flow.py` | Optional, separately sampled trajectory flow |
+| `src/mr_nwm/data.py`, `intent.py` | Fully specified synthetic data and language splits |
+| `src/mr_nwm/baselines.py` | Executable numeric baselines |
+| `src/mr_nwm/experiment.py` | Fixed-budget training, evaluation, and run manifest |
+| `src/mr_nwm/metrics.py`, `planning.py` | Prediction, parsing, timing, and decision audits |
+| `tests/` | Scientific and software regression tests |
+| `results/` | Raw metrics, summaries, environment, and saved checkpoints |
+| `paper/` | Manuscript, generated tables, and figures |
+| `docs/` | Review, reproducibility details, and deployment limits |
+
+## 中文说明
+
+本项目将“意图到目标权重的编译”和“动作条件下的连续动力学预测”放入同一个训练系统，
+并通过多速率结构、可选物理专家共享和潜空间调制连接慢层与快层。实现强制区分偏好与
+外生物理条件：在动作、初始状态和外生条件相同时，仅改变偏好文字不能改变物理预测。
+
+当前实验是可复现的双链路合成系统研究。论文中的结果均来自实际执行的三随机种子实验；
+权重共享和跨尺度梯度耦合的收益需要依据消融结果判断。已补充预训练语言模型接入、多模态连续适配器和拓扑消息传递接口；
+尚未完成语言模型版本的无线任务训练、真实无线数据验证或 RIC/DU 部署，不能据此宣称实际 6G 性能或确定性亚毫秒时延。
+
+## License and citation
+
+Code is provided under the [MIT license](LICENSE). The manuscript is a research
+preprint; please cite the actual repository revision and experiment protocol.
+
+```bibtex
+@misc{xu2026mrnwm,
+  author = {},
+  title = {MR-NWM: Language-Model-Centered World Models for Multimodal, Multi-Rate RAN Control},
+  year = {2026},
+  howpublished = {Research preprint and reference implementation},
+  url = {https://github.com/xuda1979/-6G-MR-NWM}
+}
+```
