@@ -1,0 +1,29 @@
+{
+  "INVENTION_DISCLOSURE_CN": {
+    "发明名称": 2,
+    "申请人信息": 2,
+    "发明人信息": 2,
+    "技术领域": 3,
+    "背景技术": 3,
+    "发明内容": 4,
+    "附图说明": 6,
+    "具体实施方式": 7,
+    "技术效果": 8,
+    "权利要求书": 9,
+    "说明书摘要": 10
+  },
+  "PRIOR_ART_SEARCH_CN": {
+    "检索参数 / Search Parameters": 2,
+    "A类：基础性现有技术 / Category A: Foundational Prior Art": 3,
+    "B类：无线网络控制现有技术 / Category B: Wireless Network Control Prior Art": 5,
+    "C类：模型与计算接口现有技术 / Category C: Model and Computational Interface Prior Art": 7,
+    "D类：无线建模与项目公开 / Category D: Wireless Modeling and Project Disclosure": 8,
+    "E类：专利检索结果 / Category E: Patent Search Results": 9,
+    "新颖性分析 / Novelty Analysis": 11,
+    "可专利性评估 / Patentability Assessment": 13,
+    "权利要求差异化矩阵 / Claim Differentiation Matrix": 13,
+    "关键区别特征 / Key Distinguishing Features": 14,
+    "建议申请策略 / Recommended Filing Strategy": 14,
+    "结论 / Conclusion": 15
+  }
+}

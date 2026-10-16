@@ -1,0 +1,47 @@
+{
+  "verified_date": "2026-10-16",
+  "code_baseline": "c22ec3c97919463878470ad131b4473e6cd1b25b",
+  "renderer": "LibreOffice via render_docx.py; page PNGs visually reviewed",
+  "documents": [
+    {
+      "file": "INVENTION_DISCLOSURE_CN.docx",
+      "pages": 10,
+      "heading_sequence_matches_template": true,
+      "table_count": 3,
+      "table_columns_match_template": true,
+      "native_editable_equations": 3,
+      "figure_count": 3,
+      "format_parts_byte_identical": [
+        "word/styles.xml",
+        "word/theme/theme1.xml",
+        "word/numbering.xml",
+        "word/settings.xml",
+        "word/fontTable.xml",
+        "word/webSettings.xml"
+      ],
+      "sha256": "c7b12090d746378ee75f2d4c6275280ce308a9cbadb97fc33fab30f2a066bf1f",
+      "size_bytes": 272985,
+      "visual_review": "all pages; tables, equations, drawings, pagination and glyphs checked"
+    },
+    {
+      "file": "PRIOR_ART_SEARCH_CN.docx",
+      "pages": 15,
+      "heading_sequence_matches_template": true,
+      "table_count": 21,
+      "table_columns_match_template": true,
+      "native_editable_equations": 0,
+      "figure_count": 0,
+      "format_parts_byte_identical": [
+        "word/styles.xml",
+        "word/theme/theme1.xml",
+        "word/numbering.xml",
+        "word/settings.xml",
+        "word/fontTable.xml",
+        "word/webSettings.xml"
+      ],
+      "sha256": "740985f8ab889d1837b590930fd8325f0de9edd83fe72f7cfe5712832fd1fe1e",
+      "size_bytes": 22824,
+      "visual_review": "all pages; tables, equations, drawings, pagination and glyphs checked"
+    }
+  ]
+}

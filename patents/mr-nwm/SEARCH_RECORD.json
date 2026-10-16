@@ -1,0 +1,114 @@
+{
+  "search_date": "2026-10-16",
+  "baseline_commit": "c22ec3c97919463878470ad131b4473e6cd1b25b",
+  "effective_filing_date": null,
+  "queries": [
+    "patent wireless network world model multimodal multi timescale language model",
+    "patent \"world model\" \"wireless\" network",
+    "\"6G\" \"world model\" language multimodal multi rate",
+    "site:patents.google.com \"radio access network\" \"digital twin\" \"control\"",
+    "site:patents.google.com \"大语言模型\" \"无线网络\"",
+    "site:patents.google.com \"hypernetwork\" \"recurrent\"",
+    "site:cnipa.gov.cn 专利法 第二十二条 第二十四条 第二十六条",
+    "site:cnipa.gov.cn 2026 专利审查指南 修改 人工智能 算法"
+  ],
+  "sources": [
+    {
+      "id": "P1",
+      "title": "CN120935780A",
+      "publication_date": "2025-11-11",
+      "url": "https://patents.google.com/patent/CN120935780A/zh"
+    },
+    {
+      "id": "P2",
+      "title": "WO2026071644A1",
+      "publication_date": "2026-04-02",
+      "url": "https://patents.google.com/patent/WO2026071644A1/en"
+    },
+    {
+      "id": "P3",
+      "title": "WO2025119455A1",
+      "publication_date": "2025-06-12",
+      "url": "https://patents.google.com/patent/WO2025119455A1/en"
+    },
+    {
+      "id": "P4",
+      "title": "CN121924535A",
+      "publication_date": "2026-04-24",
+      "url": "https://patents.google.com/patent/CN121924535A/zh"
+    },
+    {
+      "id": "P5",
+      "title": "US20200372352A1",
+      "publication_date": "2020-11-26",
+      "url": "https://patents.google.com/patent/US20200372352A1/en"
+    },
+    {
+      "id": "P6",
+      "title": "EP3975053A1",
+      "publication_date": "2022-03-30",
+      "url": "https://patents.google.com/patent/EP3975053A1/en"
+    },
+    {
+      "id": "P7",
+      "title": "US20240370718A1",
+      "publication_date": "2024-11-07",
+      "url": "https://patents.google.com/patent/US20240370718A1/en"
+    },
+    {
+      "id": "P8",
+      "title": "US20240265619A1",
+      "publication_date": "2024-08-08",
+      "url": "https://patents.google.com/patent/US20240265619A1/en"
+    },
+    {
+      "id": "N1",
+      "title": "HyperNetworks",
+      "publication_date": "2016-09-27",
+      "url": "https://arxiv.org/abs/1609.09106"
+    },
+    {
+      "id": "N2",
+      "title": "FiLM",
+      "publication_date": "2017-09-22",
+      "url": "https://arxiv.org/abs/1709.07871"
+    },
+    {
+      "id": "N3",
+      "title": "Agentic World Modeling for 6G",
+      "publication_date": "2025-11-04",
+      "url": "https://arxiv.org/abs/2511.02748"
+    },
+    {
+      "id": "N4",
+      "title": "Telecom World Models",
+      "publication_date": "2026-04-08",
+      "url": "https://arxiv.org/abs/2604.06882"
+    },
+    {
+      "id": "N5",
+      "title": "A Wireless World Model for AI-Native 6G Networks",
+      "publication_date": "2026-03-26",
+      "url": "https://arxiv.org/abs/2603.25216"
+    },
+    {
+      "id": "L1",
+      "title": "PRC Patent Law",
+      "publication_date": "2020-11-23",
+      "url": "https://www.cnipa.gov.cn/art/2020/11/23/art_97_155167.html"
+    },
+    {
+      "id": "L2",
+      "title": "CNIPA Order 84",
+      "publication_date": "2025-11-13",
+      "url": "https://www.cnipa.gov.cn/art/2025/11/13/art_74_202560.html"
+    }
+  ],
+  "limits": [
+    "Open-web and publication-text review; not exhaustive official-office database searching.",
+    "ArXiv date is first submission date; later versions are distinguished in the report.",
+    "Patent legal status, effective priority and unreviewed family documents require official-file verification.",
+    "Code and committed evidence were read; training and radio experiments were not rerun.",
+    "Repository commit timestamps do not prove first public availability."
+  ]
+}
