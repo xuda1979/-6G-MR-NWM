@@ -5,15 +5,14 @@ import hashlib
 import json
 import math
 import platform
-from dataclasses import asdict
 from pathlib import Path
 
 import torch
 
-from mr_nwm.data import generate_batch
-from mr_nwm.experiment import build_model, counterfactual_audit, evaluate
+from mr_nwm.experiment import verify_run
 from mr_nwm.provenance import source_hashes
-from mr_nwm.verification import compare_metrics, validate_result_rows
+from mr_nwm.run_store import save_json
+from mr_nwm.verification import validate_result_rows
 
 
 def main():
@@ -52,36 +51,13 @@ def main():
     print(f"Mode: {mode}; changed reference sources: {len(mismatches)}", flush=True)
     scalar_count = 0
     for row in manifest["results"]:
-        model = build_model(row["variant"], manifest["arguments"]["horizon"])
-        if sum(parameter.numel() for parameter in model.parameters()) != row["parameters"]:
-            raise RuntimeError(f"Parameter count mismatch: {row['variant']}")
-        if row["parameters"]:
-            path = args.results / "checkpoints" / f"{row['variant']}_{row['seed']}.pt"
-            saved = torch.load(path, map_location="cpu", weights_only=True)
-            config = asdict(model.config) if hasattr(model, "config") else None
-            if (saved["variant"], saved["seed"], saved["config"]) != (
-                row["variant"],
-                row["seed"],
-                config,
-            ):
-                raise RuntimeError(f"Checkpoint metadata mismatch: {path}")
-            model.load_state_dict(saved["state_dict"])
-        model.eval()
-        for scenario, split in (("iid", "test"), ("ood", "test"), ("iid", "composition")):
-            batch = generate_batch(
-                manifest["arguments"]["eval_size"],
-                2 * manifest["arguments"]["horizon"],
-                900_000,
-                scenario,
-                split,
-            )
-            actual = evaluate(model, batch)
-            label = "composition" if split == "composition" else scenario
-            if label == "iid":
-                actual.update(counterfactual_audit(model, batch))
-            scalar_count += compare_metrics(
-                actual, row[label], args.tolerance, f"{row['variant']}[{row['seed']}].{label}"
-            )
+        scalar_count += verify_run(
+            row,
+            manifest["arguments"],
+            args.results,
+            require_digest=manifest.get("manifest_version", 1) >= 2,
+            tolerance=args.tolerance,
+        )
         print(f"Verified {row['variant']} seed={row['seed']}")
     print(f"All {len(manifest['results'])} deterministic evaluations matched reference metrics.")
     if args.output is not None:
@@ -94,14 +70,21 @@ def main():
             "current_source_sha256": current_sources,
             "rows_verified": len(manifest["results"]),
             "metric_values_verified": scalar_count,
+            "checkpoint_digest_checks": sum(
+                bool(row.get("checkpoint_sha256"))
+                for row in manifest["results"]
+                if row["parameters"]
+            ),
+            "legacy_checkpoints_without_digests": sum(
+                not row.get("checkpoint_sha256") for row in manifest["results"] if row["parameters"]
+            ),
             "absolute_tolerance": args.tolerance,
             "python": platform.python_version(),
             "torch": torch.__version__,
             "device": "cpu",
             "excluded": ["training replay", "wall-clock latency"],
         }
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
+        save_json(args.output, report)
 
 
 if __name__ == "__main__":

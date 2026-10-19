@@ -73,11 +73,33 @@ replay optimizer updates.
 `make verify-exact`, or `python scripts/verify_results.py` without flags, additionally
 requires the recorded computational source hashes to match. It intentionally fails
 on changed computational sources; use the recorded source revision for exact replay.
-`make smoke` trains all variants for two updates, saves checkpoints, and runs this
-strict verifier against its fresh manifest. New source manifests hash project Python
+`make smoke` trains all variants for two updates, saves checkpoints, exercises
+completed-sweep recovery, and runs this strict verifier against its fresh manifest.
+New source manifests hash project Python
 files under `src/`, `scripts/`, `tests/` and the repository root; installed virtual
 environments and generated run directories are excluded.
 Across runtime or hardware changes, small floating-point differences are possible.
+
+## Interrupted sweeps and checkpoint integrity
+
+`make reproduce` creates a new version-2 manifest before starting any model, then
+commits each completed variant/seed row. `make resume` first checks the experiment
+arguments, recorded source hashes and runtime contract. It verifies checkpoint
+digests and metadata, then recomputes every completed row's deterministic metrics
+before reusing the row. An incomplete model is trained again from its original
+initialization seed; optimizer steps inside that model are not resumed.
+
+Checkpoint and JSON writes use a temporary file, flush and `fsync`, followed by
+atomic replacement. An operating-system-backed file lock prevents concurrent
+writers in one output directory. A fresh invocation refuses an occupied output
+directory unless `--resume` or `--overwrite` is explicit. Gradient clipping rejects
+non-finite norms before the optimizer update.
+
+Version-2 checkpoints include SHA-256 digests in their manifest rows; the verifier
+checks these before loading model weights. Historical version-1 checkpoints still
+support metadata and metric verification, and the audit reports that they lack
+recorded digests. Legacy manifests do not support the new resume contract.
+See [EXPERIMENT_RUNS.md](EXPERIMENT_RUNS.md) for commands and recovery boundaries.
 
 The standalone recurrent baseline uses the same fast recurrence and truncation
 schedule as MR-NWM. Compare `unshared` with `detached` for the gradient bridge;
