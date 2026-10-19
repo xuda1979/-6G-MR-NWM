@@ -5,7 +5,8 @@ Pretrained language weights initialize this backbone; numeric adapters and
 wireless prediction heads still require task-specific training.
 """
 
-from dataclasses import dataclass, field
+import math
+from dataclasses import dataclass, field, replace
 
 import torch
 from torch import nn
@@ -23,6 +24,18 @@ class FoundationInputs:
     evidence_ids: torch.Tensor | None = None
     evidence_mask: torch.Tensor | None = None
 
+    def advance(self, elapsed_seconds):
+        """Age a fixed observation snapshot without modifying caller-owned inputs."""
+        if not math.isfinite(elapsed_seconds) or elapsed_seconds < 0:
+            raise ValueError("elapsed_seconds must be nonnegative and finite")
+        return replace(
+            self,
+            modalities={
+                name: replace(observation, age_seconds=observation.age_seconds + elapsed_seconds)
+                for name, observation in self.modalities.items()
+            },
+        )
+
 
 class LanguageFoundationBackbone(nn.Module):
     """Two causal views of the same pretrained language backbone.
@@ -36,6 +49,8 @@ class LanguageFoundationBackbone(nn.Module):
         super().__init__()
         self.language_model = language_model
         self.freeze = freeze
+        if not isinstance(max_tokens, int) or max_tokens <= 0:
+            raise ValueError("max_tokens must be a positive integer")
         self.max_tokens = max_tokens
         hidden = language_model.get_input_embeddings().embedding_dim
         if freeze:
@@ -61,10 +76,12 @@ class LanguageFoundationBackbone(nn.Module):
             raise ValueError("text IDs and mask must have equal [batch, length] shape")
         if not ((mask == 0) | (mask == 1)).all() or (mask.sum(-1) == 0).any():
             raise ValueError("text mask must be binary and each text must be nonempty")
+        if ids.dtype not in (torch.int32, torch.int64):
+            raise ValueError("text IDs must be integer tensors")
         embedding = self.language_model.get_input_embeddings()
-        return embedding(ids.to(embedding.weight.device)), mask.to(
-            device=embedding.weight.device, dtype=torch.bool
-        )
+        mask = mask.to(device=embedding.weight.device, dtype=torch.bool)
+        ids = ids.to(embedding.weight.device).masked_fill(~mask, 0)
+        return embedding(ids), mask
 
     def _run(self, embeds, mask):
         if embeds.shape[1] > self.max_tokens:
@@ -113,10 +130,12 @@ class LanguageFoundationBackbone(nn.Module):
         physical_mask = torch.cat(
             [common_mask, torch.ones(batch, 1, dtype=torch.bool, device=common.device)], 1
         )
+        intent, intent_mask = self._text(inputs.intent_ids, inputs.intent_mask, batch)
+        if max(physical_embeds.shape[1], common.shape[1] + intent.shape[1]) > self.max_tokens:
+            raise ValueError("slow input exceeds max_tokens; resample modalities before encoding")
         physical_hidden = self._run(physical_embeds, physical_mask)[:, -1]
         projected = self.physical_projection(physical_hidden)
         physical, _ = self.physics.step(projected)
-        intent, intent_mask = self._text(inputs.intent_ids, inputs.intent_mask, batch)
         semantic_hidden = self._run(
             torch.cat([common, intent], 1), torch.cat([common_mask, intent_mask], 1)
         )[:, common.shape[1] :]
@@ -217,6 +236,29 @@ class LanguageBasedWorldModel(MultiRateNestedWorldModel):
                 extra.attention_mask.to(device),
             )
         return inputs
+
+    def rollout(self, intents, initial_state, actions, context, *, macro_period_seconds=None):
+        """Forecast with a fixed observation snapshot that ages at each macro boundary.
+
+        The physical clock must be supplied for multi-window multimodal forecasts.
+        For new measurements or context, call forward per window with sync_summary.
+        """
+        horizon = self.config.horizon
+        if actions.ndim != 3 or actions.shape[1] == 0 or actions.shape[1] % horizon:
+            raise ValueError("rollout length must be a positive multiple of horizon")
+        if macro_period_seconds is not None and (
+            not math.isfinite(macro_period_seconds) or macro_period_seconds <= 0
+        ):
+            raise ValueError("macro_period_seconds must be positive and finite")
+        if intents.modalities and actions.shape[1] > horizon and macro_period_seconds is None:
+            raise ValueError("multi-window modalities require macro_period_seconds")
+        state, summary, chunks = initial_state, None, []
+        for index, window in enumerate(actions.split(horizon, dim=1)):
+            inputs = intents.advance(index * (macro_period_seconds or 0))
+            output = self(inputs, state, window, context, summary)
+            chunks.append(output["pred_states"])
+            state, summary = chunks[-1][:, -1], output["sync_summary"]
+        return torch.cat(chunks, 1)
 
     def forward_slow_tier(self, intent_tokens, state, context, previous_summary=None):
         c = self.config

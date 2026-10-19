@@ -14,6 +14,7 @@ class ModalityObservation:
     period_seconds: float
     valid: torch.Tensor | None = None  # [batch, tokens], True means observed
     adjacency: torch.Tensor | None = None  # optional nonnegative [batch, nodes, nodes]
+    max_age_seconds: float | None = None  # optional expiry; acquisition period is not a TTL
 
 
 class TypedModalityEncoder(nn.Module):
@@ -69,10 +70,17 @@ class TypedModalityEncoder(nn.Module):
             period = observation.period_seconds
             if not math.isfinite(period) or period <= 0:
                 raise ValueError(f"{name}: period must be positive and finite")
-            if not torch.isfinite(values[valid]).all() or not torch.isfinite(ages[valid]).all():
-                raise ValueError(f"{name}: valid observations must be finite")
+            if not torch.isfinite(ages[valid]).all():
+                raise ValueError(f"{name}: valid observation ages must be finite")
             if (ages[valid] < 0).any():
                 raise ValueError(f"{name}: future observations are not allowed")
+            max_age = observation.max_age_seconds
+            if max_age is not None:
+                if not math.isfinite(max_age) or max_age < 0:
+                    raise ValueError(f"{name}: max_age_seconds must be nonnegative and finite")
+                valid = valid & (ages <= max_age)
+            if not torch.isfinite(values[valid]).all():
+                raise ValueError(f"{name}: valid observations must be finite")
             valid = valid.to(reference.device)
             values = values.to(device=reference.device, dtype=reference.dtype)
             ages = ages.to(device=reference.device, dtype=reference.dtype)
@@ -87,7 +95,11 @@ class TypedModalityEncoder(nn.Module):
                 if not torch.isfinite(adjacency).all() or (adjacency < 0).any():
                     raise ValueError(f"{name}: adjacency must be finite and nonnegative")
                 adjacency = adjacency * valid[:, :, None] * valid[:, None, :]
-                adjacency = adjacency / adjacency.sum(-1, keepdim=True).clamp_min(1)
+                # Normalize fractional edge weights too, keeping isolated rows at zero.
+                # Row scaling first also avoids overflow when summing large finite weights.
+                adjacency = adjacency / adjacency.amax(-1, keepdim=True).clamp_min(1)
+                degree = adjacency.sum(-1, keepdim=True)
+                adjacency = adjacency / torch.where(degree > 0, degree, 1)
                 hidden = hidden + self.graph_message(torch.bmm(adjacency, hidden))
             time_features = torch.stack(
                 [torch.log1p(ages), torch.full_like(ages, math.log1p(period))], -1

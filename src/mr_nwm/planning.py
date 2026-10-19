@@ -12,6 +12,10 @@ def planning_audit(model, batch, power_cap=0.8):
     levels = torch.tensor([0.1, 0.4, 0.7], device=device)
     candidates = torch.cartesian_prod(levels, levels)
     candidates = candidates[candidates.sum(-1) <= power_cap]
+    if candidates.shape[0] == 0:
+        # The coarse grid starts at total power 0.2. A zero-power action is still
+        # feasible below that budget; preserve the published grid at default caps.
+        candidates = levels.new_zeros(1, 2)
     size, count = batch.initial.shape[0], candidates.shape[0]
     initial = batch.initial.repeat_interleave(count, 0)
     context = batch.context.repeat_interleave(count, 0)

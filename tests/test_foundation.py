@@ -60,12 +60,18 @@ def test_language_preferences_do_not_change_physics_but_evidence_does():
     model, batch, inputs = fixture()
     model.eval()
     changed = FoundationInputs(63 - inputs.intent_ids, inputs.intent_mask, inputs.modalities)
-    first = model.rollout(inputs, batch.initial, batch.actions, batch.context)
-    second = model.rollout(changed, batch.initial, batch.actions, batch.context)
+    first = model.rollout(
+        inputs, batch.initial, batch.actions, batch.context, macro_period_seconds=0.005
+    )
+    second = model.rollout(
+        changed, batch.initial, batch.actions, batch.context, macro_period_seconds=0.005
+    )
     torch.testing.assert_close(first, second, rtol=0, atol=0)
     changed.evidence_ids = torch.ones(2, 2, dtype=torch.long)
     changed.evidence_mask = torch.ones(2, 2, dtype=torch.long)
-    third = model.rollout(changed, batch.initial, batch.actions, batch.context)
+    third = model.rollout(
+        changed, batch.initial, batch.actions, batch.context, macro_period_seconds=0.005
+    )
     assert not torch.allclose(first, third)
 
 
@@ -122,6 +128,67 @@ def test_input_budget_prevents_unbounded_modal_prefix():
     model.backbone.max_tokens = 4
     with pytest.raises(ValueError, match="max_tokens"):
         model.forward_slow_tier(inputs, batch.initial, batch.context)
+    assert model.backbone.language_model.calls == 0
+
+
+def test_semantic_budget_is_checked_before_either_decoder_pass():
+    model, batch, inputs = fixture()
+    model.backbone.max_tokens = 8  # physical prefix fits; semantic prefix does not
+    with pytest.raises(ValueError, match="max_tokens"):
+        model.forward_slow_tier(inputs, batch.initial, batch.context)
+    assert model.backbone.language_model.calls == 0
+
+
+def test_masked_text_ids_are_never_looked_up():
+    model, batch, inputs = fixture()
+    model.eval()
+    baseline = model.forward_slow_tier(inputs, batch.initial, batch.context)
+    inputs.intent_ids[~inputs.intent_mask.bool()] = -100
+    masked = model.forward_slow_tier(inputs, batch.initial, batch.context)
+    torch.testing.assert_close(baseline["objective_weights"], masked["objective_weights"])
+    inputs.intent_ids[0, 0] = -100
+    with pytest.raises((IndexError, RuntimeError)):
+        model.forward_slow_tier(inputs, batch.initial, batch.context)
+
+
+def test_multi_window_forecast_ages_snapshot_and_preserves_caller_inputs():
+    model, batch, inputs = fixture()
+    model.eval()
+    with pytest.raises(ValueError, match="macro_period_seconds"):
+        model.rollout(inputs, batch.initial, batch.actions, batch.context)
+    assert model.backbone.language_model.calls == 0
+    age = inputs.modalities["csi"].age_seconds.clone()
+    first = model(inputs, batch.initial, batch.actions[:, :5], batch.context)
+    second = model(
+        inputs.advance(0.5),
+        first["pred_states"][:, -1],
+        batch.actions[:, 5:],
+        batch.context,
+        first["sync_summary"],
+    )
+    frozen = model(
+        inputs,
+        first["pred_states"][:, -1],
+        batch.actions[:, 5:],
+        batch.context,
+        first["sync_summary"],
+    )
+    actual = model.rollout(
+        inputs, batch.initial, batch.actions, batch.context, macro_period_seconds=0.5
+    )
+    torch.testing.assert_close(actual[:, :5], first["pred_states"])
+    torch.testing.assert_close(actual[:, 5:], second["pred_states"])
+    assert not torch.allclose(actual[:, 5:], frozen["pred_states"])
+    torch.testing.assert_close(inputs.modalities["csi"].age_seconds, age)
+
+
+@pytest.mark.parametrize("period", [0, -1, float("nan"), float("inf")])
+def test_invalid_macro_clock_rejected(period):
+    model, batch, inputs = fixture()
+    with pytest.raises(ValueError, match="macro_period_seconds"):
+        model.rollout(
+            inputs, batch.initial, batch.actions, batch.context, macro_period_seconds=period
+        )
 
 
 def test_actual_transformer_forward_without_network_download():

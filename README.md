@@ -10,7 +10,8 @@ Authors are blank in the manuscript and PDF metadata.
 
 [Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
 [Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
-[Reproduction protocol](docs/REPRODUCIBILITY.md)
+[Reproduction protocol](docs/REPRODUCIBILITY.md) ·
+[Current code review](docs/REVIEW_2026_10.md)
 
 ## Research status
 
@@ -84,6 +85,9 @@ This downloads external model weights; they are not bundled. The demo checks
 integration with randomly initialized numeric adapters/heads, rather than training
 a RAN predictor. CSI/IQ use real/imaginary features, graph tokens can include an
 adjacency matrix, and each modality carries its own age, period and validity mask.
+Multi-window multimodal `rollout` calls require `macro_period_seconds` so observation
+ages advance with the forecast. Optional `max_age_seconds` masks expired measurements
+and their graph edges; set expiry from the application requirements.
 The fast tier calls no language model. For the detailed API and training boundary,
 see [LANGUAGE_FOUNDATION.md](docs/LANGUAGE_FOUNDATION.md).
 
@@ -112,10 +116,12 @@ make reproduce
 python scripts/summarize.py runs/reference/metrics.json
 ```
 
-Re-evaluate the committed final checkpoints without retraining:
+Re-evaluate the committed final checkpoints against the current code:
 
 ```bash
 make verify
+# Strict source-matched replay on the original recorded computational sources:
+make verify-exact
 ```
 
 Regenerate committed tables/figures and build the paper with a TeX installation:
@@ -127,6 +133,10 @@ make paper
 
 The summary script writes generated tables and figures from the selected metrics.
 To return to the committed reference report after a new run, use `make report`.
+`make verify` explicitly reports source differences and compares every deterministic
+scalar/vector metric, including counterfactual and decision audits. The original
+reference evidence stays intact. `make smoke` also saves and verifies fresh checkpoints
+with strict source matching. Timing and training replay are outside checkpoint verification.
 
 ## Using the model
 
