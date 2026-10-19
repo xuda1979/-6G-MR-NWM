@@ -3,7 +3,7 @@ import torch
 
 from mr_nwm.baselines import Persistence
 from mr_nwm.data import generate_batch, transition
-from mr_nwm.experiment import counterfactual_audit, nested_loss
+from mr_nwm.experiment import build_model, counterfactual_audit, nested_loss
 from mr_nwm.flow import ConditionalFlowMatchingHead
 from mr_nwm.intent import IntentTokenizer, intent_batch
 from mr_nwm.metrics import intent_metrics, latency, nmse_db
@@ -84,6 +84,21 @@ def test_candidate_filter_enforces_constraint_independently_of_model():
     metrics = planning_audit(model, batch)
     assert metrics["power_violation_rate"] == 0
     assert metrics["planning_regret"] >= 0 and metrics["candidate_count"] > 1
+
+
+@pytest.mark.parametrize("cap", [0.001, 0.1, 0.199])
+def test_tight_budget_has_a_feasible_zero_power_fallback(cap):
+    model, batch = MultiRateNestedWorldModel(), generate_batch(2, 10)
+    metrics = planning_audit(model, batch, power_cap=cap)
+    assert metrics["candidate_count"] == 1
+    assert metrics["power_violation_rate"] == 0
+    assert metrics["planning_regret"] == 0
+    assert metrics["dynamics_only_regret"] == 0
+
+
+def test_unknown_model_variant_cannot_silently_select_full_model():
+    with pytest.raises(ValueError, match="unknown model variant"):
+        build_model("misspelled", 5)
 
 
 def test_persistence_negative_control_has_zero_action_effect():

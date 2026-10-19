@@ -61,8 +61,22 @@ make paper
 
 `make reproduce` writes to ignored `runs/reference/` so the committed evidence
 stays intact. To regenerate the reference report, run `make report`.
-`make verify` checks the computational source hashes and re-evaluates every
-committed checkpoint. It does not assert reproducible wall-clock timing.
+`make verify` performs an explicit **cross-revision regression** against the original
+committed checkpoints. It records source differences and current hashes in
+`runs/checkpoint-verification.json`; it does not rewrite the reference manifest.
+The comparison covers all deterministic metrics, including per-step/per-state vectors,
+intent metrics, dynamics-only regret, feasibility, and paired action effects.
+Non-finite values, missing metrics, incomplete run grids and checkpoint metadata
+mismatches fail the audit. It does not assert reproducible wall-clock timing or
+replay optimizer updates.
+
+`make verify-exact`, or `python scripts/verify_results.py` without flags, additionally
+requires the recorded computational source hashes to match. It intentionally fails
+on changed computational sources; use the recorded source revision for exact replay.
+`make smoke` trains all variants for two updates, saves checkpoints, and runs this
+strict verifier against its fresh manifest. New source manifests hash project Python
+files under `src/`, `scripts/`, `tests/` and the repository root; installed virtual
+environments and generated run directories are excluded.
 Across runtime or hardware changes, small floating-point differences are possible.
 
 The standalone recurrent baseline uses the same fast recurrence and truncation

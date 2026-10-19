@@ -60,9 +60,28 @@ it is not a third implemented controller. `horizon=5` in the reference benchmark
 is a discrete modeling choice, not a calibrated radio deadline.
 
 Age values are relative to a caller-selected slow-update time. Future timestamps
-are rejected. Missing tokens are masked. Excessive input lengths raise an error
+are rejected. Missing tokens are masked. Optional `max_age_seconds` masks tokens
+older than the configured limit, including their incoming and outgoing graph edges.
+The acquisition period is not automatically used as an expiry limit.
+Excessive input lengths raise an error before either language-model pass
 so the caller must resample or pool streams explicitly. This module does not
 schedule network messages or solve transport delay and stale-packet fallback.
+
+For a fixed snapshot over multiple macro windows, supply the physical duration of
+one macro window. The model advances measurement ages without mutating the snapshot:
+
+```python
+trajectory = model.rollout(
+    inputs, initial, actions, context, macro_period_seconds=0.005,
+)
+```
+
+`macro_period_seconds` is required when modalities are present and the rollout spans
+multiple windows. No radio time is inferred from `horizon`. `FoundationInputs.advance(t)`
+also supports manual advancement by a nonnegative number of seconds. For newly acquired
+measurements or changing exogenous context, call the model per macro window with fresh
+inputs and the preceding `sync_summary` and predicted terminal state. A fixed-snapshot
+forecast does not generate future sensor measurements or refresh textual evidence.
 
 ## Example
 

@@ -1,7 +1,6 @@
 """Fixed-budget multi-seed training and held-out evaluation, without test-set selection."""
 
 import argparse
-import hashlib
 import json
 import platform
 import sys
@@ -18,6 +17,7 @@ from .data import generate_batch, transition
 from .metrics import intent_metrics, latency, nmse_db
 from .model import ModelConfig, MultiRateNestedWorldModel
 from .planning import planning_audit
+from .provenance import source_hashes
 
 VARIANTS = (
     "full",
@@ -32,6 +32,8 @@ VARIANTS = (
 
 
 def build_model(name, horizon):
+    if name not in VARIANTS:
+        raise ValueError(f"unknown model variant: {name}")
     if name == "persistence":
         return Persistence()
     if name == "mlp":
@@ -200,15 +202,6 @@ def run_variant(name, seed, args, device):
         flush=True,
     )
     return result
-
-
-def source_hashes():
-    root = Path(__file__).resolve().parents[2]
-    return {
-        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(root.rglob("*.py"))
-        if "__pycache__" not in str(path)
-    }
 
 
 def main():
