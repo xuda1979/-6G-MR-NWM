@@ -1,7 +1,13 @@
 """Strict comparison of deterministic benchmark evidence, including vector metrics."""
 
 import math
+from dataclasses import asdict
 from numbers import Real
+from pathlib import Path
+
+import torch
+
+from .provenance import sha256_file
 
 
 def compare_metrics(actual, expected, tolerance, path="metrics"):
@@ -36,7 +42,7 @@ def compare_metrics(actual, expected, tolerance, path="metrics"):
     return 1
 
 
-def validate_result_rows(manifest):
+def validate_result_rows(manifest, *, complete=True):
     """Missing or duplicated variant/seed rows cannot produce a successful audit."""
     arguments = manifest["arguments"]
     variants, seeds = arguments["variants"], arguments["seeds"]
@@ -49,5 +55,25 @@ def validate_result_rows(manifest):
         raise RuntimeError("Manifest requires nonempty, unique variants and seeds")
     expected = {(variant, seed) for variant in variants for seed in seeds}
     actual = [(row["variant"], row["seed"]) for row in manifest["results"]]
-    if len(actual) != len(set(actual)) or set(actual) != expected:
+    coverage = set(actual) == expected if complete else set(actual) <= expected
+    if len(actual) != len(set(actual)) or not coverage:
         raise RuntimeError("Missing, duplicated, or unexpected variant/seed result rows")
+
+
+def load_verified_checkpoint(model, row, directory, *, require_digest=False):
+    """Verify bytes and metadata before loading a run's checkpoint onto the model."""
+    if sum(parameter.numel() for parameter in model.parameters()) != row["parameters"]:
+        raise RuntimeError(f"Parameter count mismatch: {row['variant']}")
+    if not row["parameters"]:
+        return
+    path = Path(directory) / "checkpoints" / f"{row['variant']}_{row['seed']}.pt"
+    expected = row.get("checkpoint_sha256")
+    if require_digest and expected is None:
+        raise RuntimeError(f"Missing checkpoint digest: {path}; start with --checkpoints")
+    if expected is not None and sha256_file(path) != expected:
+        raise RuntimeError(f"Checkpoint digest mismatch: {path}")
+    saved = torch.load(path, map_location="cpu", weights_only=True)
+    config = asdict(model.config) if hasattr(model, "config") else None
+    if (saved["variant"], saved["seed"], saved["config"]) != (row["variant"], row["seed"], config):
+        raise RuntimeError(f"Checkpoint metadata mismatch: {path}")
+    model.load_state_dict(saved["state_dict"])

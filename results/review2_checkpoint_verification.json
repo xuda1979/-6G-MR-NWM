@@ -1,0 +1,57 @@
+{
+  "mode": "cross-revision-regression",
+  "reference_metrics_sha256": "ac7cc74da89e8ad92690fcae3eb6a7e94fd15cbc461e5a73622d453806b87005",
+  "source_mismatches": {
+    "src/mr_nwm/experiment.py": {
+      "reference": "6ec6c170bd6bfee71f5d234976150c760ff6bdfdee93b85892a294cd405d64e8",
+      "current": "3236f75278ec399f2e937884f9094419984c1033dc4366fa6e3e7296f4b29643"
+    },
+    "src/mr_nwm/planning.py": {
+      "reference": "513bfe6e233f2aed3dc552fbb62b54f0c9a5e744f06feb67915ef8b7ca40aa2a",
+      "current": "92c5e5106ad6fe9e8d68ae9c87820a255fd5d094e0190fc80bc5100db9c1b8ff"
+    }
+  },
+  "current_source_sha256": {
+    "scripts/audit_intents.py": "dc669e7d8fd636fd3005d19ef33ea5a9f6dbb615940f250ad648158ca83d9d7c",
+    "scripts/pretrained_demo.py": "52ccc9fa6c5bcbba254c92d41f369f89cc4025de6bb79df27a3cb2f90fc94251",
+    "scripts/summarize.py": "830d444c4c07c3318bc36e6debe0e1c3a2a06553d84cb77979ea98f51ac29a47",
+    "scripts/verify_results.py": "b9b6fb70e36abe77206d22e12d6b92f9c8d8526e86c703c5ea6fc9f0488881e1",
+    "src/mr_nwm/__init__.py": "41d53ba76106498a27cc68297174cc432d967d430f0f26b86633da4090004001",
+    "src/mr_nwm/baselines.py": "a4d03c554a2ffd198801d1161f46ae2fdd2e88831b3319faa4397ec8eeac6492",
+    "src/mr_nwm/data.py": "f4f3c27dcfe12f6b6c599fd86ee64c6d34a46f90569f72e9ec8512978887c478",
+    "src/mr_nwm/experiment.py": "3236f75278ec399f2e937884f9094419984c1033dc4366fa6e3e7296f4b29643",
+    "src/mr_nwm/experts.py": "0f7017f11230196dcb0cb1196f1f3ea0125d0bd7e2208a95127b649bdee48865",
+    "src/mr_nwm/flow.py": "beb3bd0d8235c7f44e23a3f636e190e1d2495dc540d2249ae4dc15c8530a6378",
+    "src/mr_nwm/foundation.py": "ae7db7af564345245e662b8db556293e0969a860226f403fbfe09b5c823a394d",
+    "src/mr_nwm/intent.py": "e86b5639e6546233c0681922236bc8c0e3856b7b9c6bcf034d6e3b0fb5a161ba",
+    "src/mr_nwm/metrics.py": "5fbb035643191fb2fae37f396719bc5f3563ef8ebb08ffda5c221b22471c741d",
+    "src/mr_nwm/modalities.py": "efe10140a850f6e73a2d81613a2b6ba19bd29f845ac7992eeb0072c38d5f7b28",
+    "src/mr_nwm/model.py": "e60f0e1733b8b1e376e43331422adc146160d67661997870ca3bf327fc2c8c8c",
+    "src/mr_nwm/planning.py": "92c5e5106ad6fe9e8d68ae9c87820a255fd5d094e0190fc80bc5100db9c1b8ff",
+    "src/mr_nwm/provenance.py": "dd279e02f1d19d1d7ff19dbd3e28f577c845d53453ec60b8a36fed69a547a9c6",
+    "src/mr_nwm/rules.py": "15b1968d65ddadc47df39ddcc20f5f7d088536c82a186e35a8a486e3845f45b1",
+    "src/mr_nwm/run_store.py": "bb3be9bd70e99d294ca35d64dd4b762bb64f9637047db4668d357956ce11bb96",
+    "src/mr_nwm/verification.py": "39d3c06b72be6a669b629a6f5d243ba9025ed466c8a79a86249e1347a95ecfba",
+    "tests/conftest.py": "175fd8eb011adca48dff773439ce7ff41339e66ea1605578fa786083590c3b61",
+    "tests/test_experiment_resume.py": "2173467d30fc81ab26d9eb7abe057dc6997420b3998fc9e5fdef782fac17014d",
+    "tests/test_foundation.py": "17c2e9ebd476a13c81b3205cfc1230711671c13608c5692ca8758ab2afb778e5",
+    "tests/test_modalities.py": "e9587260a8e758882c59d0ba8a39550be977aea556e89d38a1e2b522bfc299f3",
+    "tests/test_model.py": "677f42405a917c7309be7707006fd416e0c95fa96dbadca04e1811e238e96772",
+    "tests/test_rules.py": "d7837ae012f73dcdd99b227504ba2f17d42151a5ccff0c17150b05f8fb12f0f8",
+    "tests/test_science.py": "ecfa7116c0d40f90412daef3ecc340e014f1ebb9432ec5a848107043f19361a7",
+    "tests/test_verification.py": "f215f091b728c38dfdc14ea16dba694fac4408b41d2ee6d2bce2f5f67ac0926b",
+    "train_and_eval.py": "10d779750a7f99b33871c30a3e2315ddf00fc75308f4a6ef19f042d949d291ab"
+  },
+  "rows_verified": 24,
+  "metric_values_verified": 1560,
+  "checkpoint_digest_checks": 0,
+  "legacy_checkpoints_without_digests": 21,
+  "absolute_tolerance": 1e-05,
+  "python": "3.12.14",
+  "torch": "2.5.1+cpu",
+  "device": "cpu",
+  "excluded": [
+    "training replay",
+    "wall-clock latency"
+  ]
+}

@@ -1,4 +1,6 @@
-.PHONY: test lint smoke reproduce report verify verify-exact paper
+.PHONY: test lint smoke reproduce resume report verify verify-exact paper
+
+SMOKE_ARGS = --steps 2 --seeds 11 --eval-size 8 --latency-repeats 3 --checkpoints --output runs/smoke
 
 test:
 	python -m pytest -q
@@ -8,11 +10,15 @@ lint:
 	python -m ruff format --check .
 
 smoke:
-	python train_and_eval.py --steps 2 --seeds 11 --eval-size 8 --latency-repeats 3 --checkpoints --output runs/smoke
+	python train_and_eval.py $(SMOKE_ARGS) --overwrite
+	python train_and_eval.py $(SMOKE_ARGS) --resume
 	python scripts/verify_results.py --results runs/smoke --output runs/smoke/verification.json
 
 reproduce:
 	python train_and_eval.py --steps 300 --seeds 11 22 33 --checkpoints --output runs/reference
+
+resume:
+	python train_and_eval.py --steps 300 --seeds 11 22 33 --checkpoints --resume --output runs/reference
 
 report:
 	python scripts/summarize.py results/metrics.json

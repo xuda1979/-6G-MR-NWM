@@ -1,7 +1,6 @@
 """Fixed-budget multi-seed training and held-out evaluation, without test-set selection."""
 
 import argparse
-import json
 import platform
 import sys
 import time
@@ -10,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from filelock import FileLock, Timeout
 from torch.nn import functional as F
 
 from .baselines import Persistence, ResidualMLP, StandaloneSSM
@@ -17,7 +17,9 @@ from .data import generate_batch, transition
 from .metrics import intent_metrics, latency, nmse_db
 from .model import ModelConfig, MultiRateNestedWorldModel
 from .planning import planning_audit
-from .provenance import source_hashes
+from .provenance import sha256_file, source_hashes
+from .run_store import MANIFEST_VERSION, load_resume_manifest, save_checkpoint, save_json
+from .verification import compare_metrics, load_verified_checkpoint
 
 VARIANTS = (
     "full",
@@ -114,6 +116,26 @@ def counterfactual_audit(model, batch):
     }
 
 
+def verify_run(row, arguments, directory, *, device="cpu", require_digest=False, tolerance=1e-5):
+    """Re-evaluate a completed run before reusing its metrics or publishing an audit."""
+    model = build_model(row["variant"], arguments["horizon"]).to(device)
+    load_verified_checkpoint(model, row, directory, require_digest=require_digest)
+    model.eval()
+    count = 0
+    for scenario, split in (("iid", "test"), ("ood", "test"), ("iid", "composition")):
+        batch = generate_batch(
+            arguments["eval_size"], 2 * arguments["horizon"], 900_000, scenario, split
+        ).to(device)
+        actual = evaluate(model, batch)
+        label = "composition" if split == "composition" else scenario
+        if label == "iid":
+            actual.update(counterfactual_audit(model, batch))
+        count += compare_metrics(
+            actual, row[label], tolerance, f"{row['variant']}[{row['seed']}].{label}"
+        )
+    return count
+
+
 def run_variant(name, seed, args, device):
     torch.manual_seed(seed)
     model = build_model(name, args.horizon).to(device)
@@ -137,7 +159,7 @@ def run_variant(name, seed, args, device):
             if not torch.isfinite(loss):
                 raise RuntimeError(f"non-finite loss: {name}, seed={seed}, step={update}")
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1, error_if_nonfinite=True)
             optimizer.step()
             if update == 0 or (update + 1) % 50 == 0 or update + 1 == args.steps:
                 trace.append({"step": update + 1, "loss": loss.item()})
@@ -187,15 +209,17 @@ def run_variant(name, seed, args, device):
     if parameters and args.checkpoints:
         checkpoint = Path(args.output) / "checkpoints"
         checkpoint.mkdir(parents=True, exist_ok=True)
-        torch.save(
+        path = checkpoint / f"{name}_{seed}.pt"
+        save_checkpoint(
+            path,
             {
                 "state_dict": model.state_dict(),
                 "variant": name,
                 "seed": seed,
                 "config": asdict(model.config) if hasattr(model, "config") else None,
             },
-            checkpoint / f"{name}_{seed}.pt",
         )
+        result["checkpoint_sha256"] = sha256_file(path)
     print(
         f"DONE {name} seed={seed}: IID={result['iid']['nmse_db']:.2f} dB, "
         f"OOD={result['ood']['nmse_db']:.2f} dB ({training_seconds:.1f}s)",
@@ -217,11 +241,24 @@ def main():
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--output", default="runs/reference")
     parser.add_argument("--checkpoints", action="store_true")
+    restart = parser.add_mutually_exclusive_group()
+    restart.add_argument(
+        "--resume",
+        action="store_true",
+        help="reuse verified completed runs; restart unfinished models from their seeds",
+    )
+    restart.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="explicitly replace the output run's experiment record",
+    )
     args = parser.parse_args()
     if min(args.steps, args.batch_size, args.eval_size, args.horizon, args.threads) < 1:
         parser.error("steps, batch size, eval size, horizon and threads must be positive")
     if args.latency_repeats < 2:
         parser.error("latency-repeats must be at least 2")
+    if len(set(args.seeds)) != len(args.seeds) or len(set(args.variants)) != len(args.variants):
+        parser.error("seeds and variants must be unique")
     if args.device.startswith("npu"):
         import torch_npu  # noqa: F401
     device = torch.device(args.device)
@@ -230,6 +267,7 @@ def main():
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     manifest = {
+        "manifest_version": MANIFEST_VERSION,
         "protocol": "synthetic-two-link-v1",
         "arguments": vars(args),
         "environment": {
@@ -245,13 +283,34 @@ def main():
         "command": sys.argv,
         "results": [],
     }
-    for variant in args.variants:
-        for seed in args.seeds:
-            result = run_variant(variant, seed, args, device)
-            manifest["results"].append(result)
-            temporary = output / "metrics.tmp"
-            temporary.write_text(json.dumps(manifest, indent=2, allow_nan=False) + "\n")
-            temporary.replace(output / "metrics.json")
+    try:
+        with FileLock(output / ".run.lock", timeout=0):
+            path = output / "metrics.json"
+            if args.resume:
+                if not path.is_file():
+                    parser.error("--resume requires an existing metrics.json")
+                manifest = load_resume_manifest(path, manifest)
+                # Check every completed checkpoint before reusing any row or writing new results.
+                for row in manifest["results"]:
+                    print(f"CHECK {row['variant']} seed={row['seed']}: completed run", flush=True)
+                    verify_run(
+                        row, manifest["arguments"], output, device=device, require_digest=True
+                    )
+                manifest.setdefault("resume_commands", []).append(sys.argv)
+            elif not args.overwrite and any(item.name != ".run.lock" for item in output.iterdir()):
+                parser.error("output run already contains artifacts; use --resume or --overwrite")
+            save_json(path, manifest)
+            completed = {(row["variant"], row["seed"]) for row in manifest["results"]}
+            for variant in args.variants:
+                for seed in args.seeds:
+                    if (variant, seed) in completed:
+                        print(f"REUSE {variant} seed={seed}: verified completed run", flush=True)
+                        continue
+                    result = run_variant(variant, seed, args, device)
+                    manifest["results"].append(result)
+                    save_json(path, manifest)
+    except Timeout:
+        parser.error(f"another experiment writer holds the lock for {output}")
 
 
 if __name__ == "__main__":

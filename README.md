@@ -116,6 +116,13 @@ make reproduce
 python scripts/summarize.py runs/reference/metrics.json
 ```
 
+Resume an interrupted reference sweep with `make resume`. Completed variant/seed
+runs are checked against checkpoint hashes and recomputed metrics, then reused.
+An unfinished model restarts from its original seed. Sources, experiment settings
+and runtime must match. Existing output directories require an explicit `--resume`
+or `--overwrite`; one writer at a time can hold the run-directory lock.
+See [experiment recovery and artifact integrity](docs/EXPERIMENT_RUNS.md).
+
 Re-evaluate the committed final checkpoints against the current code:
 
 ```bash
@@ -137,6 +144,8 @@ To return to the committed reference report after a new run, use `make report`.
 scalar/vector metric, including counterfactual and decision audits. The original
 reference evidence stays intact. `make smoke` also saves and verifies fresh checkpoints
 with strict source matching. Timing and training replay are outside checkpoint verification.
+New checkpoints and JSON records are written atomically. Version-2 run manifests
+record checkpoint SHA-256 hashes; historical checkpoints retain their original evidence format.
 
 ## Using the model
 
