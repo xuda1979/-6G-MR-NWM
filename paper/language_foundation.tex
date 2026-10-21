@@ -139,7 +139,10 @@ gradients still propagate \emph{through} the transformer into numeric adapters.
 Disabling autograd around the frozen trunk would break that training path and
 is deliberately avoided. The numeric adapters, context projections, modulation
 heads, and dynamics predictor start untrained; pretrained text weights do not
-automatically provide a calibrated wireless world model.
+automatically provide a calibrated wireless world model. Section~\ref{sec:public}
+separately task-trains these numerical modules around a frozen SmolLM2 trunk
+for public throughput/delay forecasting. The Qwen integration record below
+retains its original, untrained numerical heads.
 
 \subsection{Multiple observation rates and execution rates}
 The architecture distinguishes three quantities: each modality's acquisition
@@ -184,6 +187,7 @@ checkpoint-loading check.
 The following lightweight variant replaces the expensive language trunk with
 small train-from-scratch attention/MLP components. Its controlled experiments
 isolate recurrent dynamics, sharing, and modulation at low cost. The numerical
-results later in this paper belong \emph{only} to that lightweight variant.
+synthetic results belong \emph{only} to that lightweight variant.
 They are not evaluations of Qwen or evidence that language pretraining improves
-wireless prediction.
+wireless prediction. The separate public-data study reports both language-backed
+and numeric forecasts under its own source, split and measurement contract.

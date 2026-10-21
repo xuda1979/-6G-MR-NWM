@@ -1,5 +1,10 @@
 # Technical review and corrections
 
+This is the historical draft/synthetic review. Current task-trained measured-trace
+evidence is described in [PUBLIC_DATA.md](PUBLIC_DATA.md) and
+[the measured-data results](../results/public_data/SUMMARY.md); the findings below
+retain their original experimental scope.
+
 The starting material consisted of two pasted manuscript/code drafts. This
 release reconstructs executable source rather than running their embedded shell
 or bundler scripts. The original pasted conversations are not included.

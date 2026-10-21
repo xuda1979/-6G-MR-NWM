@@ -1,5 +1,24 @@
 # Recovering experiment sweeps
 
+The original synthetic runner and the new measured-data runner have separate
+contracts and recovery behavior. See [public-data protocol](PUBLIC_DATA.md).
+
+## Public measured-data runs
+
+```bash
+python scripts/train_public.py --dataset ucc4g --output runs/public-results/ucc4g --resume
+```
+
+The public runner saves model adapters, optimizer state, sampling-generator state,
+PyTorch RNG, selected validation checkpoint and exposure counts every 30 updates.
+An interrupted run resumes from its last completed checkpoint. Exact uninterrupted
+versus interrupted/resumed training is covered by offline regression tests.
+Completed runs require matching source/data/runtime contracts and artifact hashes
+before reuse. `scripts/verify_public.py` separately replays final selected adapters
+against authenticated raw holdouts; its command does not retrain the model.
+
+## Synthetic sweep recovery
+
 The experiment runner preserves completed variant/seed runs across interruptions.
 Every reusable row is tied to a fixed experiment contract and a saved checkpoint.
 

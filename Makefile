@@ -1,4 +1,4 @@
-.PHONY: test lint smoke reproduce resume report verify verify-exact paper
+.PHONY: test lint smoke reproduce resume report verify verify-exact paper public-train public-verify public-report
 
 SMOKE_ARGS = --steps 2 --seeds 11 --eval-size 8 --latency-repeats 3 --checkpoints --output runs/smoke
 
@@ -32,3 +32,14 @@ verify-exact:
 
 paper:
 	cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
+
+public-train:
+	python scripts/train_public.py --dataset ucc4g --output runs/public-results/ucc4g --resume
+	python scripts/train_public.py --dataset ucc5g --output runs/public-results/ucc5g --resume
+	python scripts/train_public.py --dataset cicv5g --output runs/public-results/cicv5g --resume
+
+public-verify:
+	python scripts/verify_public.py
+
+public-report:
+	python scripts/report_public.py

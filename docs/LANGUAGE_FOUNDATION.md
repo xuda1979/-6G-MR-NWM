@@ -3,7 +3,13 @@
 The intended MR-NWM backbone is a pretrained language transformer. The public
 API is `mr_nwm.foundation.LanguageBasedWorldModel.from_pretrained(...)`. The
 smaller model in `model.py` is kept intact as the reproducible experimental
-reference; its scores must not be attributed to the language-foundation model.
+reference; its synthetic scores must not be attributed to the language-foundation model.
+
+The separate [public measured-data study](PUBLIC_DATA.md) now trains the language
+path's numeric adapters, projections, modulation and dynamics around a frozen
+SmolLM2-135M trunk. Its [results and checkpoints](../results/public_data/SUMMARY.md)
+cover five-step throughput/delay forecasts. The earlier Qwen integration-only
+record and the example below retain untrained numeric heads.
 
 ## What is connected
 
@@ -162,7 +168,15 @@ The committed pretrained record covers its recorded source hashes. The precision
 checks in this revision use an offline random decoder; they do not repeat the
 full pretrained-checkpoint loading check.
 
-The architecture still needs synchronized radio datasets, numeric-adapter
-alignment, task training, realistic out-of-distribution evaluation, and target
-hardware measurements. Integration success cannot establish RAN accuracy,
-general intent understanding, or a real-time guarantee.
+The public-data runner supplies measured telemetry alignment and task training
+for four historical feature channels, masks and five-step measurement targets.
+It does not train raw CSI/IQ, topology/vision tasks or the preference head.
+Both neural models receive the same flattened history; the language path also
+receives typed telemetry tokens. This comparison does not isolate pretraining
+from architecture or capacity. Per-component updates and an unchanged frozen
+backbone fingerprint are recorded, and adapter checkpoints omit trunk weights.
+
+The architecture still needs intervention/action datasets, broader modality
+alignment, realistic out-of-distribution control evaluation and target-hardware
+measurements. A successful forecast task cannot establish general intent
+understanding, closed-loop RAN value or a real-time guarantee.

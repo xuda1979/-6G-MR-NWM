@@ -14,7 +14,7 @@ the full forward method resamples hidden states into a next-window summary.
 | Parameter sharing | Identical Python module object when enabled | Consistent versioned weight copies on each process/device |
 | Packet lifetime | Caller-managed in memory | Sequence number, expiry, version and normalization checks |
 | Timing | Repeated host-observed inference timings | Hardware-specific end-to-end deadline and load/tail tests |
-| Data | Normalized synthetic arrays | Timestamped, calibrated telemetry and missing-data handling |
+| Data | Synthetic arrays and separate measured-trace forecasts | Target-calibrated telemetry, actuator records and missing-data handling |
 | Failure | Ordinary exceptions | Local fallback for stale/missing context and failed inference |
 | Safety | Explicit finite power-budget candidate filter | Application-specific hard constraints and independent validation |
 | Interfaces | Python tensor API | Selected O-RAN service model and supported actuators |
@@ -25,7 +25,10 @@ inside E2 nodes where supported. The architecture specification does not turn
 Python fast-step measurements into a sub-millisecond control guarantee, and an
 arbitrary modulation packet is not automatically a standardized E2 message.
 
-The next practical step is calibrated simulation and recorded-trace evaluation,
-followed by a small testbed. The project should establish action-ranking value,
+The [public measured-trace study](PUBLIC_DATA.md) supplies observational forecasts
+from historical throughput/delay, radio indicators and speed. Those source
+records do not supervise power/PRB interventions. The next practical step is
+calibrated control simulation or recorded-action evaluation, followed by a small
+testbed. The project should establish action-ranking value,
 multi-step calibration, and sensitivity to stale context before integration with
 live network control.

@@ -1,0 +1,107 @@
+\section{Public Measured-Data Forecasting}
+\label{sec:public}
+\subsection{Sources and frozen prediction contract}
+We additionally execute an observational forecast study on three freely
+available measured collections: UCC4G~\cite{ucc4g}, UCC5G~\cite{ucc5g}, and
+CICV5G~\cite{cicv5g}. We download the production-trace archives and individual
+vehicle-network runs, excluding the neighboring ns-3 archives and aggregated
+copies. UCC4G and CICV5G data have CC BY 4.0 terms. UCC5G supplies GPL-3.0 at
+repository level without separately identifying a data-specific license.
+The manifests retain immutable source revisions, archive/file hashes and
+attribution; the code's MIT license does not relicense source data.
+
+The downloaded collections contain 174,523, 188,711 and 155,330 raw rows in
+135, 83 and 90 files, respectively. After removing one identical CICV run,
+we group any remaining traces sharing exact timestamp-and-feature events.
+Whole groups receive a deterministic name-hash split: approximately 70\%
+training, 10\% validation and 20\% testing, independently of initialization
+seed or target performance. This is a held-out-run split, not a future-date
+or held-out-city guarantee. Repeated timestamps retain their final logger
+row. Gaps exceeding 1.5 times the trace's median interval split sequences.
+Missing future targets or a missing last observed target reject a window.
+
+Each input contains eight historical values of downlink throughput or
+round-trip delay, RSRP, SNR/SINR, speed, and their explicit feature masks.
+We predict the next five measured target values, using stride five.
+Throughput is converted from kbps to Mbps; UCC speed is converted from km/h
+to m/s. CICV delay remains in ms. Future receive timestamps, post-reception
+vehicle coordinates and future signal values never enter the model.
+The per-window cadence uses historical timestamps only; token ages use a
+uniform-spacing approximation at that cadence. The whole-trace median is
+used only for offline gap filtering. Historical target values undergo
+\texttt{log1p}; each channel is standardized using observed training-history
+values only. Missing values retain a mask and zero normalized placeholder.
+
+This processing yields 1,358/610/229 training/validation/test windows for
+UCC4G, 4,110/752/998 for UCC5G, and 18,053/4,155/6,618 for CICV5G.
+The accepted-window source groups number 63/6/14, 60/6/17 and 61/13/15,
+respectively. Strict gap filtering excludes many downloaded rows; it does
+not establish performance during outages or missing intervals.
+Validation uses up to 256 windows and testing up to 512, selected by the
+smallest SHA-256 values of stable sample IDs. Thus all 229 UCC4G test
+windows and 512 windows from each other dataset are evaluated. Every
+model uses the same selected IDs.
+
+\subsection{Executed models and optimization}
+We instantiate the language-centered model with the frozen
+SmolLM2-135M~\cite{smollm2} trunk at its recorded immutable revision.
+The four normalized features and masks form eight continuous telemetry
+tokens. Both neural models additionally receive the same flattened history
+and masks plus the historical cadence as continuous context. The current
+state is the last observed normalized target. The output is a one-dimensional
+target trajectory; these tasks do not supervise the original six-state toy
+system. The cached fast recurrence executes five steps without a transformer
+call. Zero action placeholders carry no invented intervention information;
+the preference head receives no task supervision.
+
+The numeric MR-NWM retains width 32, recurrent memory 16 and modulation
+rank two. The language version trains input adapters, context projections,
+modulation and dynamics while the pretrained trunk remains frozen.
+Component-specific parameter changes and matching before/after trunk
+fingerprints verify those roles. Full pretrained weights are omitted from
+the saved adapter checkpoints. Last-observation persistence and ridge
+regression on the same historical inputs provide deterministic controls.
+Ridge uses a fixed regularization coefficient of ten and predicts each
+normalized log-target increment directly.
+
+Each learned run receives 300 AdamW updates, batch size eight, learning
+rate 0.001, weight decay $10^{-4}$, and global gradient clipping at one.
+Samples are drawn uniformly with replacement from all eligible training
+windows. The loss is normalized log-target MSE; the checkpoint with lowest
+physical-unit validation MAE, measured every 30 updates, is selected.
+Test targets are used only after checkpoint selection. Seeds 11, 22 and
+33 give three independently initialized task-adapter/core runs per model
+and dataset. This fixed budget does not assert convergence or equal FLOPs.
+The record retains actual unique-window exposure and recovery state.
+
+\begin{table*}[t]
+\centering
+\caption{Five-step measured-data forecast MAE, in each source's physical
+units; lower is better. Neural values are mean $\pm$ sample SD across three
+initialization seeds; deterministic controls have one result. The table
+is generated from the separate public-data manifests.}
+\label{tab:public}
+\input{public_results.tex}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{figures/public_forecast.pdf}
+\caption{Measured-source forecast errors with initialization SD. Different
+panels use different physical units and datasets. No control action-return
+or deadline claim follows from this forecast comparison.}
+\label{fig:public}
+\end{figure*}
+
+\subsection{Results and evidence boundary}
+\input{public_discussion.tex}
+
+Retained per-sample predictions and measured targets permit independent
+metric recomputation. Checkpoint/source digests, selected steps and frozen
+backbone identities permit replay against the same raw holdouts. This
+extends the language path beyond an untrained integration check, using
+public measured observations and trained numerical modules. The experiment
+does not isolate pretraining from capacity/architecture, calibrate raw
+CSI/IQ or vision, learn a general objective parser, or identify causal
+responses to RAN interventions. Such questions require additional aligned
+data and explicit controlled experiments.

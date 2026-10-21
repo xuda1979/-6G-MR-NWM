@@ -1,9 +1,30 @@
 # Reproduction protocol
 
-## Two distinct validation records
+## Separate evidence families
+
+The public measured-data study is recorded under [`results/public_data/`](../results/public_data/).
+It trains frozen-SmolLM2-backed numerical modules and the numeric reference model
+on UCC4G, UCC5G and CICV5G, with held-out source groups and retained physical-unit
+predictions. [PUBLIC_DATA.md](PUBLIC_DATA.md) specifies source terms, hashes,
+cleaning, training-only scaling and evaluation membership. Its scores have a
+different measurement contract from the synthetic benchmark below.
+
+```bash
+make public-train
+make public-verify
+make public-report
+```
+
+`public-verify` authenticates the complete run grid, current computational source
+hashes, raw dataset manifest, held-out IDs, train-only scaler, checkpoints and
+predictions. It independently recomputes physical-unit metrics and replays the
+selected adapters. Full pretrained backbone weights are downloaded separately;
+their fingerprint must match the executed run. Use `--no-replay` with the script
+only for the explicitly narrower saved-evidence audit. Neither verification mode
+replays optimizer training or establishes field-control performance.
 
 `results/metrics.json` records the small-network synthetic benchmark below.
-`results/pretrained_integration.json` records the separately executed Qwen2.5-0.5B
+`results/pretrained_integration.json` preserves the separately executed Qwen2.5-0.5B
 checkpoint integration, with resolved model revision and source hashes. The latter
 checks interfaces, numeric-adapter gradients through a frozen pretrained trunk,
 and preference invariance; it does not report trained RAN performance.

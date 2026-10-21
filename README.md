@@ -9,7 +9,10 @@ train-from-scratch reference model used for the reproducible synthetic benchmark
 Authors are blank in the manuscript and PDF metadata.
 
 [Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
-[Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
+[中文论文要点](docs/OVERVIEW_CN.md) ·
+[Public-data results](results/public_data/SUMMARY.md) ·
+[Public datasets and training](docs/PUBLIC_DATA.md) ·
+[Synthetic results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
 [Reproduction protocol](docs/REPRODUCIBILITY.md) ·
 [Current code review](docs/REVIEW_2026_10.md)
 
@@ -19,15 +22,42 @@ There are two explicit code paths:
 
 | Path | Backbone | Evidence |
 |---|---|---|
-| `LanguageBasedWorldModel` in `foundation.py` | External pretrained language transformer and tokenizer | Multimodal, gradient, causality and API integration checks; no trained RAN performance claim |
+| `LanguageBasedWorldModel` in `foundation.py` | External pretrained language transformer and tokenizer | Qwen integration checks; separately trained SmolLM2-backed adapters and dynamics on three measured public trace datasets |
 | `MultiRateNestedWorldModel` in `model.py` | Small randomly initialized attention/MLP mixture | Committed three-seed, eight-variant two-link synthetic benchmark |
 
-The published benchmark numbers belong **only to the lightweight reference path**.
-No measured radio data or deployed RIC/DU is included. A pretrained text model
-still needs numeric-adapter alignment and wireless task training. Radio deadlines
-must be measured on the target system.
+The original two-link synthetic benchmark numbers belong **only to the lightweight
+reference path**. A separate measured-data study trains the language-based and
+numeric models on public UCC4G, UCC5G and CICV5G traces. It forecasts five future
+throughput or delay observations from eight historical observations, with whole-run
+holdouts and persistence/ridge controls. Results and evidence are kept under
+[`results/public_data/`](results/public_data/); the original evidence is preserved.
+These observational traces contain no radio-control intervention or intent labels.
+RIC/DU deployment, control return and real-time deadlines remain unmeasured.
 
 See [language-foundation inputs and timescales](docs/LANGUAGE_FOUNDATION.md).
+
+## Train on free public measured data
+
+The runner downloads authenticated, pinned sources (about 24 MB total), removes
+duplicate/overlapping run leakage, segments timestamp gaps and fits normalization
+only on training histories. Every learned run receives 300 updates, batch size 8,
+with seeds 11, 22 and 33. SmolLM2-135M stays frozen; numeric adapters, modulation
+and dynamics train through it. Model weights are downloaded separately.
+
+```bash
+python -m pip install -e '.[foundation,dev,paper]'
+make public-train
+make public-verify
+make public-report
+make paper
+```
+
+See [dataset terms, cleaning, split and scoring protocol](docs/PUBLIC_DATA.md).
+Published prediction archives include source-derived held-out targets under the
+upstream data terms; see [NOTICE](results/public_data/NOTICE.md). The test cohort
+is capped at 512 stable-ID windows per source (229 available for UCC4G). Training
+samples eligible windows with replacement; this bounded study does not claim
+full-data convergence or isolate a causal benefit from language pretraining.
 
 ## What is implemented
 
@@ -173,6 +203,9 @@ and checked by `scripts/verify_results.py`.
 | Path | Purpose |
 |---|---|
 | `src/mr_nwm/foundation.py` | Pretrained language-centered slow backbone and fast API |
+| `src/mr_nwm/public_data.py`, `public_sources.py` | Pinned measured-source ingestion, cleaning and group holdouts |
+| `src/mr_nwm/public_forecast.py` | Train-only transforms, measured-target model adaptation and recovery |
+| `scripts/train_public.py`, `verify_public.py`, `report_public.py` | Measured-trace training, checkpoint replay and generated reports |
 | `src/mr_nwm/modalities.py` | Continuous tokens, time/validity masks, and graph messages |
 | `src/mr_nwm/model.py` | Lightweight reference model and shared multi-rate execution API |
 | `src/mr_nwm/experts.py` | Causal mixture and recurrent core |
@@ -188,13 +221,11 @@ and checked by `scripts/verify_results.py`.
 
 ## 中文说明
 
-本项目将“意图到目标权重的编译”和“动作条件下的连续动力学预测”放入同一个训练系统，
-并通过多速率结构、可选物理专家共享和潜空间调制连接慢层与快层。实现强制区分偏好与
-外生物理条件：在动作、初始状态和外生条件相同时，仅改变偏好文字不能改变物理预测。
-
-当前实验是可复现的双链路合成系统研究。论文中的结果均来自实际执行的三随机种子实验；
-权重共享和跨尺度梯度耦合的收益需要依据消融结果判断。已补充预训练语言模型接入、多模态连续适配器和拓扑消息传递接口；
-尚未完成语言模型版本的无线任务训练、真实无线数据验证或 RIC/DU 部署，不能据此宣称实际 6G 性能或确定性亚毫秒时延。
+阅读[中文论文要点](docs/OVERVIEW_CN.md)，快速了解问题、方法、创新、输入／输出与架构。
+新增三套免费公开实测数据的训练和预测评测：UCC 4G、UCC 5G 及 CICV5G。
+语言版本训练冻结 SmolLM2-135M 周围的数值适配器与快层，原合成控制实验独立保留。
+[实测结果](results/public_data/SUMMARY.md)与[数据和复现协议](docs/PUBLIC_DATA.md)
+说明实际数据量、分组划分、对照和局限；这些记录支持观测预测，控制收益仍待验证。
 
 ## License and citation
 

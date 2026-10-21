@@ -35,11 +35,15 @@ We supply this pretrained-model integration alongside a lightweight,
 train-from-scratch reference variant. Three-seed, eight-variant measurements on
 a fully specified two-link queue/interference simulator evaluate only the
 lightweight variant: dynamics, distribution shift, controlled-language parsing,
-action effects, decision regret, and host-observed timing. Those results do not
-establish performance of a trained language-foundation RAN model. The project
-provides executable multimodal/gradient/causality tests and a reproducible path
-from the small reference experiment toward the intended language-based system,
-without claiming calibrated radio behavior or deterministic real-time deadlines.
+action effects, decision regret, and host-observed timing. A separate study
+trains numeric adapters and dynamics around a frozen SmolLM2-135M backbone on
+three free public measured datasets: UCC4G, UCC5G and CICV5G. Whole-trace holdouts,
+train-only normalization, three initialization seeds, persistence and ridge
+controls, retained predictions and adapter checkpoints make its five-step
+throughput/delay forecasts auditable. The observed traces provide no supervised
+radio-control interventions. Their forecast errors and the synthetic control
+audit therefore establish different, explicitly separated forms of evidence;
+neither establishes deployed control return or deterministic real-time deadlines.
 \end{abstract}
 
 \section{Introduction}
@@ -117,9 +121,12 @@ claim about improved uncertainty calibration follows from its presence.
 The repository has two explicit realizations. The language-foundation path
 loads an external pretrained transformer and tokenizer and adds numeric/graph
 adapters. The lightweight benchmark path uses randomly initialized semantic
-MLPs, with no pretrained language weights. No over-the-air measurements, RIC
-integration, or DU deployment are supplied. The controlled-language benchmark
-cannot support open-domain or foundation-model zero-shot claims.
+MLPs, with no pretrained language weights. In addition to their separate
+synthetic/integration records, both paths are task-trained for measurement
+forecasting on downloaded public cellular traces. The datasets retain upstream
+provenance and terms; no new radio measurement campaign, RIC integration or DU
+deployment is supplied. The controlled-language benchmark cannot support
+open-domain or foundation-model zero-shot claims.
 
 \section{Problem Formulation}
 \subsection{State, actions, context, and intent}
@@ -439,6 +446,8 @@ combination; it is not a foundation-model zero-shot benchmark.}
 
 \input{discussion.tex}
 
+\input{public_data.tex}
+
 \section{Deployment Contract and Further Validation}
 Both Python realizations separate one slow call from $K$ cached-packet fast calls, which
 allows later export of the fast subnetwork. No transport or asynchronous runtime
@@ -448,14 +457,14 @@ numbers, expiry handling, and a local fallback when context is stale. Parameters
 shared during training would be copied consistently into the deployed modules.
 These are requirements for an integration study, not features verified here.
 
-A credible next evaluation should first replace the synthetic environment with
-calibrated radio simulation and held-out measured traces. Sionna is one available
-physical-layer research framework \cite{hoydis2022}. A topology-aware extension
-must specify graph inputs and compare with graph-based baselines. The supplied pretrained
-semantic integration must be task-trained and evaluated with its named model,
-actual checkpoint and license, a disjoint task corpus, and an explicit conversion
-from free-form instructions to objective and constraint schemas. The controlled-language
-baseline here should remain to reveal the marginal value of pretraining.
+The public measured-data study adds held-out cellular observations. The next
+control evaluation still needs calibrated radio simulation or measured
+intervention/action records. Sionna is one available physical-layer research
+framework \cite{hoydis2022}. A topology-aware extension must specify graph inputs
+and compare with graph-based baselines. The semantic objective head needs a
+disjoint task corpus and an explicit conversion from free-form instructions to
+objective/constraint schemas. The controlled-language baseline should remain
+to reveal the marginal value of pretraining.
 
 An expanded stochastic study should compare the optional flow head with
 deterministic regression, ensembles, and simpler likelihood models, including
@@ -468,7 +477,7 @@ CPU-tested code and a synchronized accelerator timing path; no NPU or GPU
 measurement is claimed by this release.
 
 \section{Limitations and Conclusion}
-The benchmark's small state space, short horizon, known context, random power
+The synthetic benchmark's small state space, short horizon, known context, random power
 coverage, and templated language make it useful for debugging but inadequate
 for ranking general-purpose 6G architectures. Three initialization seeds expose
 some optimization variation; because evaluation trajectories are shared, their
@@ -477,6 +486,15 @@ environments. The synthetic dynamics have no units or calibrated radio timing.
 The recurrent state update is bounded but the whole predictor is not certified
 stable. A hard power filter provides only that specific actuator guarantee,
 not general reliability or safety.
+
+The public study uses three existing collections, strict gap-filtered cohorts,
+at most 512 test windows per dataset, one small frozen pretrained backbone,
+and a fixed 300-update budget. These choices bound both coverage and
+optimization. Initialization variability does not replace session/site-level
+uncertainty. The comparison changes architecture and allocated capacity along
+with the presence of a language backbone, so it does not isolate a causal
+benefit of pretraining. Observational forecasting does not identify responses
+to interventions on power, scheduling or other RAN actuators.
 
 The intended MR-NWM foundation is a pretrained language model with continuous
 modality adapters and a cached fast physical subnetwork. Within the measured
@@ -492,7 +510,10 @@ source hashes, environment metadata, generated tables, and figure-generation
 code are available in the repository. The paper tables are generated directly
 from the committed result JSON. Trained toy checkpoints are preserved in the
 release project; their state dictionaries can be re-evaluated using the supplied
-script. Code is distributed under the included MIT license. The manuscript
+script. Public measured-data predictions and adapter checkpoints have a separate
+manifest, source identities and replay script. Raw datasets and pretrained
+trunk weights are downloaded from the named upstream sources; their licenses
+remain applicable. Code is distributed under the included MIT license. The manuscript
 is a research preprint and makes no claim of peer review.
 
 \begin{thebibliography}{11}
@@ -521,5 +542,20 @@ Images with One Multi-Modal Model,'' arXiv:2408.11039, 2024.
 Next-Generation Physical Layer Research,'' arXiv:2203.11854, 2022.
 \bibitem{qwen2024} Qwen Team, ``Qwen2.5-0.5B, pretrained base language model,
 2024. \url{https://huggingface.co/Qwen/Qwen2.5-0.5B}.
+\bibitem{ucc4g} D. Raca, J. Quinlan, A. Zahran, and C. Sreenan,
+``Beyond Throughput: a 4G LTE Dataset with Channel and Context Metrics,''
+in \emph{MMSys}, 2018, doi:10.1145/3204949.3208123.
+Dataset: \url{https://doi.org/10.5281/zenodo.1219679}.
+\bibitem{ucc5g} D. Raca, D. Leahy, C. J. Sreenan, and J. J. Quinlan,
+``Beyond Throughput, The Next Generation: A 5G Dataset with Channel and
+Context Metrics,'' in \emph{MMSys}, 2020, doi:10.1145/3339825.3394938.
+\url{https://github.com/uccmisl/5Gdataset}.
+\bibitem{cicv5g} X. Zhang et al., ``5G communication delay dataset for
+cloud-based vehicle planning and control,'' \emph{Scientific Data}, 2026,
+doi:10.1038/s41597-026-07239-7.
+Dataset: \url{https://doi.org/10.5281/zenodo.17475688}.
+\bibitem{smollm2} Hugging Face, ``SmolLM2-135M,'' pretrained model,
+revision 93efa2f097d58c2a74874c7e644dbc9b0cee75a2.
+\url{https://huggingface.co/HuggingFaceTB/SmolLM2-135M}.
 \end{thebibliography}
 \end{document}

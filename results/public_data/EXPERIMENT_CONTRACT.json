@@ -1,0 +1,83 @@
+{
+  "experiment_id": "EXP-PUBLIC-20261021-V1",
+  "status": "approved",
+  "baseline_revision": "314d2db3ad4f5c62a5c15c0008d8fee0353f8cb9",
+  "objective": "Measured-trace training, auditable held-out forecasts, synchronized repository results and a new PR",
+  "hypothesis": "Trainable numeric adapters and a cached recurrent predictor around a frozen pretrained transformer can learn five-step measurement forecasts; superiority to simpler baselines is evaluated, not presumed.",
+  "datasets": [
+    "ucc4g",
+    "ucc5g",
+    "cicv5g"
+  ],
+  "models": [
+    "persistence",
+    "ridge",
+    "numeric",
+    "foundation"
+  ],
+  "history": 8,
+  "horizon": 5,
+  "stride": 5,
+  "updates_per_learned_run": 300,
+  "batch_size": 8,
+  "initialization_seeds": [
+    11,
+    22,
+    33
+  ],
+  "learning_rate": 0.001,
+  "optimizer": "AdamW",
+  "gradient_clip": 1.0,
+  "loss": "MSE of train-normalized log1p target",
+  "validation_every": 30,
+  "validation_limit": 256,
+  "test_limit": 512,
+  "evaluation_ids": "lowest SHA256(sample_id), stable source-group splits",
+  "primary_metric": "MAE in physical units over selected windows and all five steps",
+  "guardrails": [
+    "no source-group overlap",
+    "no target or future receipt/context input",
+    "train-only normalization",
+    "finite gradients/metrics",
+    "adapter updates verified; frozen language weights unchanged",
+    "checkpoint reconstruction and independent metric recomputation"
+  ],
+  "checkpoint_selection": "minimum validation MAE; evaluate test after selection",
+  "language_model": "HuggingFaceTB/SmolLM2-135M",
+  "language_revision": "93efa2f097d58c2a74874c7e644dbc9b0cee75a2",
+  "budgets": {
+    "total_wall_minutes": 60,
+    "accelerator_minutes": 0,
+    "money": 0,
+    "storage_bytes": 300000000,
+    "per_dataset_process_threads": 2
+  },
+  "preflight": "118 tests, Ruff lint/format, independent raw reconstruction of 27 samples, train-only real-data canary; optimizer recovery exact",
+  "promotion": "Publish complete authenticated evidence regardless of rank; do not replace defaults or claim control superiority",
+  "stop_conditions": [
+    "nonfinite loss/gradient/metric",
+    "backbone hash mismatch",
+    "source or contract mutation",
+    "budget exhaustion",
+    "invalid or missing split"
+  ],
+  "source_sha256": {
+    "scripts/train_public.py": "ac156220ec28fd9ff00af0c1ae4160702ce6eec31e5bc5af3c14457bbf931d99",
+    "src/mr_nwm/public_data.py": "6857314a0554fc8d1dc0b371c3e75ca3c8de5be6687588a96ff97bf072185165",
+    "src/mr_nwm/public_sources.py": "f00a732e232709c865b8ddae930cb95fa55cb373909a9fd505a7339c17a218fe",
+    "src/mr_nwm/public_forecast.py": "a954de5c8a6090e765e6d7c21d4f5447300722b8af3bfb46f21f401e88f599ff",
+    "src/mr_nwm/model.py": "e60f0e1733b8b1e376e43331422adc146160d67661997870ca3bf327fc2c8c8c",
+    "src/mr_nwm/foundation.py": "ae7db7af564345245e662b8db556293e0969a860226f403fbfe09b5c823a394d",
+    "src/mr_nwm/modalities.py": "d5153580e53325cdb951304056558942bf2b114af6570a271d4caef38db29927",
+    "src/mr_nwm/experts.py": "0f7017f11230196dcb0cb1196f1f3ea0125d0bd7e2208a95127b649bdee48865",
+    "src/mr_nwm/flow.py": "beb3bd0d8235c7f44e23a3f636e190e1d2495dc540d2249ae4dc15c8530a6378",
+    "src/mr_nwm/run_store.py": "bb3be9bd70e99d294ca35d64dd4b762bb64f9637047db4668d357956ce11bb96",
+    "src/mr_nwm/verification.py": "39d3c06b72be6a669b629a6f5d243ba9025ed466c8a79a86249e1347a95ecfba"
+  },
+  "limitations": [
+    "observational targets; no radio-control intervention labels",
+    "fixed optimization budget with replacement, not full-data convergence",
+    "five observation steps with history-inferred ages; gap-filtered cohort",
+    "seed SD is not site-level uncertainty; only one small pretrained backbone"
+  ]
+}
