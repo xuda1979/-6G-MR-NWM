@@ -9,6 +9,7 @@ train-from-scratch reference model used for the reproducible synthetic benchmark
 Authors are blank in the manuscript and PDF metadata.
 
 [Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
+[中文论文要点（3–5 分钟）](docs/OVERVIEW_CN.md) ·
 [Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
 [Reproduction protocol](docs/REPRODUCIBILITY.md) ·
 [Current code review](docs/REVIEW_2026_10.md)
@@ -188,13 +189,9 @@ and checked by `scripts/verify_results.py`.
 
 ## 中文说明
 
-本项目将“意图到目标权重的编译”和“动作条件下的连续动力学预测”放入同一个训练系统，
-并通过多速率结构、可选物理专家共享和潜空间调制连接慢层与快层。实现强制区分偏好与
-外生物理条件：在动作、初始状态和外生条件相同时，仅改变偏好文字不能改变物理预测。
-
-当前实验是可复现的双链路合成系统研究。论文中的结果均来自实际执行的三随机种子实验；
-权重共享和跨尺度梯度耦合的收益需要依据消融结果判断。已补充预训练语言模型接入、多模态连续适配器和拓扑消息传递接口；
-尚未完成语言模型版本的无线任务训练、真实无线数据验证或 RIC/DU 部署，不能据此宣称实际 6G 性能或确定性亚毫秒时延。
+阅读[中文论文要点](docs/OVERVIEW_CN.md)，快速了解研究问题、方法、创新、模型输入／输出、
+架构和实验结论。该说明区分语言基座实现与轻量参考实验，并随论文、代码和结果同步维护；
+更新要求见 [PR 模板](.github/pull_request_template.md)。
 
 ## License and citation
 
