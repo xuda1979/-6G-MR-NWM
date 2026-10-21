@@ -67,6 +67,8 @@ class TypedModalityEncoder(nn.Module):
             if valid.shape != values.shape[:2] or valid.dtype != torch.bool:
                 raise ValueError(f"{name}: valid must be a boolean [batch, tokens] mask")
             ages = observation.age_seconds
+            if ages.is_complex():
+                raise ValueError(f"{name}: observation ages must be real-valued")
             period = observation.period_seconds
             if not math.isfinite(period) or period <= 0:
                 raise ValueError(f"{name}: period must be positive and finite")
@@ -83,27 +85,41 @@ class TypedModalityEncoder(nn.Module):
                 raise ValueError(f"{name}: valid observations must be finite")
             valid = valid.to(reference.device)
             values = values.to(device=reference.device, dtype=reference.dtype)
-            ages = ages.to(device=reference.device, dtype=reference.dtype)
             values = torch.where(valid[..., None], values, 0)
+            if not torch.isfinite(values).all():
+                raise ValueError(f"{name}: valid observations must be representable in model dtype")
+            # Compress seconds before narrowing: a finite age can overflow FP16
+            # even though its logarithm is small. Preserve FP64 source ranges too.
+            ages = ages.to(
+                device=reference.device, dtype=torch.promote_types(ages.dtype, torch.float32)
+            )
             ages = torch.where(valid, ages, 0)
             hidden = self.adapters[name](values)
             if observation.adjacency is not None:
-                adjacency = observation.adjacency.to(reference)
+                adjacency = observation.adjacency
                 count = values.shape[1]
                 if adjacency.shape != (batch_size, count, count):
                     raise ValueError(f"{name}: adjacency shape mismatch")
+                if adjacency.is_complex():
+                    raise ValueError(f"{name}: adjacency must be real-valued")
+                adjacency = adjacency.to(
+                    device=reference.device,
+                    dtype=torch.promote_types(adjacency.dtype, torch.float32),
+                )
                 if not torch.isfinite(adjacency).all() or (adjacency < 0).any():
                     raise ValueError(f"{name}: adjacency must be finite and nonnegative")
                 adjacency = adjacency * valid[:, :, None] * valid[:, None, :]
-                # Normalize fractional edge weights too, keeping isolated rows at zero.
-                # Row scaling first also avoids overflow when summing large finite weights.
-                adjacency = adjacency / adjacency.amax(-1, keepdim=True).clamp_min(1)
+                # Normalize before narrowing so small weights do not disappear and
+                # large weights do not overflow. Zero rows remain isolated.
+                scale = adjacency.amax(-1, keepdim=True)
+                adjacency = adjacency / torch.where(scale > 0, scale, 1)
                 degree = adjacency.sum(-1, keepdim=True)
                 adjacency = adjacency / torch.where(degree > 0, degree, 1)
+                adjacency = adjacency.to(dtype=reference.dtype)
                 hidden = hidden + self.graph_message(torch.bmm(adjacency, hidden))
             time_features = torch.stack(
                 [torch.log1p(ages), torch.full_like(ages, math.log1p(period))], -1
-            )
+            ).to(dtype=reference.dtype)
             hidden = hidden + self.time_embedding(time_features) + self.type_embedding.weight[index]
             tokens.append(torch.where(valid[..., None], hidden, 0))
             masks.append(valid)

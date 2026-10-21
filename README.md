@@ -10,6 +10,8 @@ Authors are blank in the manuscript and PDF metadata.
 
 [Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
 [中文论文要点（3–5 分钟）](docs/OVERVIEW_CN.md) ·
+[架构与多时间尺度详解](docs/ARCHITECTURE_CN.md) ·
+[公开免费真实数据集](docs/REAL_DATASETS_CN.md) ·
 [Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
 [Reproduction protocol](docs/REPRODUCIBILITY.md) ·
 [Current code review](docs/REVIEW_2026_10.md)
