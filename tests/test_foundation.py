@@ -191,7 +191,8 @@ def test_invalid_macro_clock_rejected(period):
         )
 
 
-def test_actual_transformer_forward_without_network_download():
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_actual_transformer_forward_without_network_download(dtype):
     transformers = pytest.importorskip("transformers")
     config = transformers.Qwen2Config(
         vocab_size=64,
@@ -204,11 +205,33 @@ def test_actual_transformer_forward_without_network_download():
     )
     config._attn_implementation = "eager"
     decoder = transformers.Qwen2Model(config)
-    model = LanguageBasedWorldModel(decoder, modality_dimensions={"csi": 4}).eval()
+    model = (
+        LanguageBasedWorldModel(decoder, modality_dimensions={"csi": 4, "graph": 3})
+        .to(dtype=dtype)
+        .eval()
+    )
+    nn.init.normal_(model.delta.weight, std=0.03)
     batch = generate_batch(2, 5, 70)
     inputs = FoundationInputs(
-        torch.ones(2, 3, dtype=torch.long), torch.ones(2, 3, dtype=torch.long)
+        torch.ones(2, 3, dtype=torch.long),
+        torch.ones(2, 3, dtype=torch.long),
+        {
+            "csi": ModalityObservation(torch.randn(2, 3, 4), torch.full((2, 3), 86400.0), 0.001),
+            "graph": ModalityObservation(
+                torch.randn(2, 2, 3),
+                torch.zeros(2, 2),
+                1.0,
+                adjacency=torch.ones(2, 2, 2) * 1e-8,
+            ),
+        },
     )
-    output = model(inputs, batch.initial, batch.actions, batch.context)
+    output = model(
+        inputs, batch.initial.to(dtype), batch.actions.to(dtype), batch.context.to(dtype)
+    )
     assert output["pred_states"].shape == (2, 5, 6)
     assert torch.isfinite(output["objective_weights"]).all()
+    assert torch.isfinite(output["pred_states"]).all()
+    output["pred_states"].float().square().mean().backward()
+    gradient = model.backbone.modalities.adapters["csi"][1].weight.grad
+    assert gradient is not None and torch.isfinite(gradient).all() and gradient.abs().sum() > 0
+    assert all(parameter.grad is None for parameter in decoder.parameters())

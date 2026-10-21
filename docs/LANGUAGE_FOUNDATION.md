@@ -83,6 +83,31 @@ measurements or changing exogenous context, call the model per macro window with
 inputs and the preceding `sync_summary` and predicted terminal state. A fixed-snapshot
 forecast does not generate future sensor measurements or refresh textual evidence.
 
+## Numerical precision at the modality boundary
+
+Keep observation ages and graph weights in FP32 or FP64 until they reach the
+encoder, even when model parameters use FP16 or BF16. The encoder computes
+`log1p(age)` and row-normalizes graph weights before converting those bounded
+features to the model dtype. These operations use at least FP32 and retain FP64
+when supplied. For example, 86,400 seconds exceeds the largest finite FP16 value,
+but its logarithmic age feature is representable. Likewise, casting an entire
+graph with edge weights of `1e-8` to FP16 before normalization would erase its edges.
+
+Graph normalization first masks edges touching missing or expired nodes, divides
+each nonzero row by its largest weight, and then divides by the scaled row sum.
+Isolated rows stay zero. This preserves relative weights under positive row
+rescaling within floating-point accuracy, while avoiding overflow in the row sum.
+Very small relative weights may still round to zero in the final model dtype.
+Metadata already rounded or overflowed by the caller cannot be recovered.
+
+Valid measurements must also remain finite after conversion to the model dtype;
+otherwise the encoder raises `ValueError` before the numeric adapter runs. It does
+not silently clip measurements or change their units. Calibration and feature
+scaling belong in the data pipeline. Ages and adjacency must be real-valued;
+complex CSI/IQ still use the explicit real/imaginary feature pairs described above.
+These checks cover the input boundary, rather than guaranteeing finite outputs
+for arbitrary weights, optimizer settings, or precision policies.
+
 ## Example
 
 ```python
@@ -127,10 +152,15 @@ backbone itself is not implemented by the dynamic low-rank fast-head mechanism.
 The offline contract tests cover shared physics weights, causal separation,
 changes in physical evidence/modalities, graph adjacency and missing tokens,
 input ages, token budgets, and input-adapter gradients through a frozen trunk.
+Precision regressions cover FP16, BF16, and FP32, including wide-range FP64
+metadata and an offline, randomly initialized Qwen decoder with backward passes.
 `scripts/pretrained_demo.py` additionally attempts a real pretrained checkpoint,
 records its resolved revision and source hashes, and audits gradient and
 preference invariance. A completed integration record, if available, is stored
 separately from the small-network benchmark.
+The committed pretrained record covers its recorded source hashes. The precision
+checks in this revision use an offline random decoder; they do not repeat the
+full pretrained-checkpoint loading check.
 
 The architecture still needs synchronized radio datasets, numeric-adapter
 alignment, task training, realistic out-of-distribution evaluation, and target

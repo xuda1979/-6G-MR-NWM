@@ -55,6 +55,11 @@ A modality encoder creates continuous tokens
 The implementation supports variable token counts, explicitly masked missing
 observations, and an input-token budget. A modality can be absent entirely.
 Negative ages, non-finite valid measurements, and malformed masks are rejected.
+An optional modality-specific maximum age removes expired tokens and their graph
+edges; the acquisition period itself is not an expiry threshold. For a fixed
+snapshot across macro windows, the caller supplies $\Delta T$ explicitly and
+the rollout advances ages by $j\Delta T$ at window $j$, without inventing new
+measurements or modifying the original snapshot.
 These checks make the temporal information explicit; they are not a distributed
 clock-synchronization or missing-data recovery system.
 
@@ -77,7 +82,19 @@ Visual/map features & Continuous patch feature vectors & Configurable numeric pa
 \end{table*}
 
 For graph inputs, an optional normalized adjacency operator mixes neighboring
-node embeddings before fusion. For CSI/IQ, the caller supplies explicit real
+node embeddings before fusion. With effective node-validity indicators $v_i$,
+the operator uses $\widetilde A_{ij}=v_i v_j A_{ij}$ and row-normalizes
+$\widetilde A$, leaving isolated rows zero. Computation divides each nonzero row
+by its largest weight before taking the row sum. This avoids overflow while
+preserving relative weights under positive row rescaling, within floating-point
+accuracy. Both graph normalization and logarithmic age encoding run in at least
+FP32, retaining FP64 input precision when provided, before conversion to the
+model dtype. For example, one day in seconds overflows FP16 while its logarithmic
+feature is representable; casting raw small edge weights to FP16 can similarly
+erase a graph before normalization. Valid measurements that overflow the model
+dtype are rejected before adapter execution. These input checks do not establish
+numerical stability for arbitrary learned parameters or training settings.
+For CSI/IQ, the caller supplies explicit real
 and imaginary components with known dimensions. Image or map patches can use
 the same registered-adapter interface, but this release does not include a
 pretrained vision encoder or raw-camera pipeline. Adapter presence alone does
@@ -159,6 +176,10 @@ weights, and preference changes left physical predictions unchanged. The record
 is stored in \texttt{pretrained\_integration.json}. This establishes
 software/gradient compatibility rather than a trained RAN model or a general
 language-understanding score.
+That historical record covers the source hashes it contains. The current
+precision regressions use a small, randomly initialized Qwen decoder for forward
+and backward passes in FP16, BF16, and FP32; they do not repeat the full pretrained
+checkpoint-loading check.
 
 The following lightweight variant replaces the expensive language trunk with
 small train-from-scratch attention/MLP components. Its controlled experiments
