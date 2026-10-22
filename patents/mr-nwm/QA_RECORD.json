@@ -1,16 +1,29 @@
 {
-  "verified_date": "2026-10-16",
-  "code_baseline": "c22ec3c97919463878470ad131b4473e6cd1b25b",
-  "renderer": "LibreOffice via render_docx.py; page PNGs visually reviewed",
+  "verified_date": "2026-10-22",
+  "scope": "Revised disclosure and exporter; historical prior-art report retained unchanged",
+  "code_baseline": "d403a7249d97ab08b2a3c5257ee8a3b841638f85",
+  "renderer": "Bundled LibreOffice via render_docx.py; all 10 page PNGs visually reviewed",
   "documents": [
     {
       "file": "INVENTION_DISCLOSURE_CN.docx",
+      "verified_date": "2026-10-22",
       "pages": 10,
-      "heading_sequence_matches_template": true,
+      "page_limit": 10,
+      "root_heading_sequence_matches_previous_disclosure": true,
+      "root_heading_count": 11,
+      "metadata_fields_preserved": true,
       "table_count": 3,
-      "table_columns_match_template": true,
+      "table_column_counts": [
+        2,
+        2,
+        3
+      ],
       "native_editable_equations": 3,
-      "figure_count": 3,
+      "figure_count": 5,
+      "candidate_claim_count": 10,
+      "body_matches_markdown_source": true,
+      "embedded_figures_match_png_sources": true,
+      "toc_page_numbers_verified": true,
       "format_parts_byte_identical": [
         "word/styles.xml",
         "word/theme/theme1.xml",
@@ -19,9 +32,11 @@
         "word/fontTable.xml",
         "word/webSettings.xml"
       ],
-      "sha256": "c7b12090d746378ee75f2d4c6275280ce308a9cbadb97fc33fab30f2a066bf1f",
-      "size_bytes": 272985,
-      "visual_review": "all pages; tables, equations, drawings, pagination and glyphs checked"
+      "layout": "Letter; 11 pt body; Noto Sans CJK SC; explicit paragraph and table spacing",
+      "sha256": "b81c441edb2f981446f9b420b8e4ff06342ba4f22e8ac58d245acf41d48ff3e6",
+      "size_bytes": 383850,
+      "source_sha256": "dfa60243c5595ffa542070db45e937197b5ce34e62206d110ac66855539ade8b",
+      "visual_review": "All pages checked; final changes to pages 7 and 8 re-rendered and inspected, remaining page PNGs byte-identical to reviewed render; no clipping, missing glyphs, table or equation overflow"
     },
     {
       "file": "PRIOR_ART_SEARCH_CN.docx",
@@ -41,7 +56,17 @@
       ],
       "sha256": "740985f8ab889d1837b590930fd8325f0de9edd83fe72f7cfe5712832fd1fe1e",
       "size_bytes": 22824,
-      "visual_review": "all pages; tables, equations, drawings, pagination and glyphs checked"
+      "visual_review": "all pages; tables, equations, drawings, pagination and glyphs checked",
+      "verified_date": "2026-10-16",
+      "current_revision_status": "unchanged historical report; not reassessed for the revised claims"
     }
-  ]
+  ],
+  "checks": {
+    "exporter_py_compile": "passed",
+    "git_diff_check": "passed",
+    "source_equation_guard": "passed",
+    "iid_nmse_values_match_results_summary": "passed",
+    "historical_search_and_native_templates_unchanged": "passed"
+  },
+  "evidence_boundary": "Static source inspection and document validation only; no new training, wireless protocol execution, real-network measurement, prior-art search or standards-essentiality assessment"
 }
