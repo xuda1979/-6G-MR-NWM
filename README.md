@@ -1,15 +1,19 @@
 # 6G-MR-NWM
 
-**Language-Model-Centered World Models for Multimodal, Multi-Rate RAN Control**
+**A multi-rate world-model research component for 6G Agentic RAN.**
 
-The intended architecture uses a **pretrained language transformer as the slow
-shared multimodal backbone**, plus continuous modality encoders and a cached
-fast recurrent physics subnetwork. The project also preserves the smaller
-train-from-scratch reference model used for the reproducible synthetic benchmark.
+This repository studies how a multimodal world model can support RAN agents with
+causal state forecasts and comparable evaluation of candidate radio actions. The
+pretrained-language-model path and the lightweight synthetic reference path are
+research components; this repository does not implement a complete Agentic RAN
+orchestrator, a RIC/E2 integration, or a live radio-control loop. The proposed
+system architecture and implementation boundaries are documented in the
+[Chinese Agentic RAN technical report](docs/AGENTIC_RAN_TECHNICAL_REPORT_CN.md).
 Authors are blank in the manuscript and PDF metadata.
 
 [Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
 [中文论文要点（3–5 分钟）](docs/OVERVIEW_CN.md) ·
+[中文 Agentic RAN 技术报告](docs/AGENTIC_RAN_TECHNICAL_REPORT_CN.md) ·
 [架构与多时间尺度详解](docs/ARCHITECTURE_CN.md) ·
 [公开免费真实数据集](docs/REAL_DATASETS_CN.md) ·
 [Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
@@ -31,6 +35,15 @@ still needs numeric-adapter alignment and wireless task training. Radio deadline
 must be measured on the target system.
 
 See [language-foundation inputs and timescales](docs/LANGUAGE_FOUNDATION.md).
+
+## Role in 6G Agentic RAN
+
+MR-NWM is positioned as the world-model and candidate-forecasting component in a
+larger Agentic RAN system. The report describes a supervisory agent, a capability
+catalog, a deterministic safety gate, evidence tracking, multi-rate observation
+handling, and separate physical-context and business-policy lifecycles. These are
+architecture proposals unless a matching implementation or experiment is cited.
+The current code and benchmark scope remain summarized in [Research status](#research-status).
 
 ## What is implemented
 

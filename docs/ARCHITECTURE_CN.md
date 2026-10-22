@@ -2,6 +2,8 @@
 
 核对日期：2026-10-21；实现依据：[314d2db](https://github.com/xuda1979/-6G-MR-NWM/tree/314d2db)。本页展开[中文论文要点](OVERVIEW_CN.md)中的架构。下面先说明已实现的网络，再给出真实数据接入时需要完成的处理。
 
+在 6G Agentic RAN 中，本页描述预测与候选状态评估组件的模型结构，不代表完整智能体编排或实网控制实现。Agent Harness、能力目录、上下文生命周期、执行安全门和证据闭环的系统设计见[中文 Agentic RAN 技术报告](AGENTIC_RAN_TECHNICAL_REPORT_CN.md)。
+
 ## 1. 模型究竟由哪些部分组成
 
 `LanguageBasedWorldModel` 以预训练语言 Transformer 为慢层，以带记忆的轻量递归网络为快层。语言和连续观测在同一嵌入空间中融合；快层直接接收数值状态与动作。连续 CSI、IQ 或图像特征通过模态适配器进入骨干。
