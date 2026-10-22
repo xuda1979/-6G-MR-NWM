@@ -72,7 +72,11 @@ one macro window. The model advances measurement ages without mutating the snaps
 
 ```python
 trajectory = model.rollout(
-    inputs, initial, actions, context, macro_period_seconds=0.005,
+    inputs,
+    initial,
+    actions,
+    context,
+    macro_period_seconds=0.005,
 )
 ```
 

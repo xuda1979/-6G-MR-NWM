@@ -35,11 +35,17 @@ We supply this pretrained-model integration alongside a lightweight,
 train-from-scratch reference variant. Three-seed, eight-variant measurements on
 a fully specified two-link queue/interference simulator evaluate only the
 lightweight variant: dynamics, distribution shift, controlled-language parsing,
-action effects, decision regret, and host-observed timing. Those results do not
-establish performance of a trained language-foundation RAN model. The project
-provides executable multimodal/gradient/causality tests and a reproducible path
-from the small reference experiment toward the intended language-based system,
-without claiming calibrated radio behavior or deterministic real-time deadlines.
+action effects, decision regret, and host-observed timing. A separate Stage-A
+check trains a small LSTM forecaster on the public 5G-IANA UC6 real 5G
+measurement campaign (26{,}733 one-second KPI records, no control log) and
+measures four-second KPI forecasts against persistence on chronologically
+later sessions: throughput, RTT, and RSRQ improve by 31--43\% NMSE while RSRP,
+nearly constant at this horizon, is forecast worse than persistence. Those
+results do not establish performance of a trained language-foundation RAN
+model. The project provides executable multimodal/gradient/causality tests and
+a reproducible path from the small reference experiment and the real-data
+forecast check toward the intended language-based system, without claiming
+calibrated radio behavior or deterministic real-time deadlines.
 \end{abstract}
 
 \section{Introduction}
@@ -317,6 +323,7 @@ rollout. We test differentiation and sampling reproducibility, while leaving
 probabilistic accuracy and calibration for a dedicated study.
 
 \section{Reproducible Evaluation Protocol}
+\label{sec:protocol}
 \subsection{Normalized two-link environment}
 The state contains two link gains $g$, two queues $q$, and two interference
 variables $j$. Actions are two normalized powers $p\in[0,1]^2$; context contains
@@ -439,6 +446,126 @@ combination; it is not a foundation-model zero-shot benchmark.}
 
 \input{discussion.tex}
 
+\section{Real-Measurement Stage-A Checks}
+\label{sec:uc6}
+To probe the pipeline against physically measured data, we run an
+observation-forecasting stage on the public 5G-IANA UC6 campaign~\cite{uc6dataset}
+(Zenodo record
+10037164, CC~BY~4.0): 26{,}733 one-second records of throughput, RTT, RSRQ, and
+RSRP between a Nokia edge server and a vehicle-mounted OBU near Ulm, with GPS
+position. The campaign contains no control-action log, so this stage
+deliberately excludes action conditioning and the language/intent path; it
+exercises only data ingestion, cleaning, real-time windowing, and multi-step
+KPI forecasting.
+
+Rows are split into trajectory segments at time gaps above 60~s or GPS jumps
+above 250~m, yielding 96 segments of which 52 are usable. Missing KPI samples
+(21 throughput, 7{,}310 RSRQ/RSRP) are linearly interpolated within segments
+and tracked by validity masks; duplicate-second records are ordered, and
+glitched positions are repaired before deriving speed and heading context.
+Windows use 8~s of history and a 4~s horizon on the native one-second grid.
+Splitting is by whole segment in chronological order (70/15/15\%): overlapping
+windows never cross the train/evaluation boundary, and test windows come from
+physically later measurement sessions. Normalization statistics are fit on
+training segments only. This yields 16{,}312 training, 3{,}639 validation, and
+6{,}149 test windows.
+
+The forecaster is a deliberately small LSTM (hidden width 64, one layer,
+19{,}344 parameters) over the normalized KPI history, with a linear mobility
+context gate (position, heading, speed) and a linear decoder producing the
+normalized 4-step KPI forecast. It is trained with Adam (learning rate
+$10^{-3}$, batch 128, 2{,}000 updates) under a masked MSE loss; the identical
+protocol runs for initialization seeds 11, 22, and 33. The baseline is
+persistence, i.e., repeating the last observed value. Because persistence is
+deterministic given the data, its seed-to-seed standard deviation is exactly
+zero. Training ran on an Ascend~910B NPU host; each seed completes in about
+21~s. Metrics are computed only at observed target positions, in physical
+units.
+
+Table~\ref{tab:uc6} reports mean $\pm$ sample standard deviation across the
+three seeds. The learned forecaster reduces NMSE relative to persistence by
+38\% on throughput, 43\% on RTT, and 31\% on RSRQ. Two findings qualify the
+result. First, RSRP is forecast worse than persistence
+(skill $-0.49$): in this campaign RSRP is nearly constant within a horizon of
+a few seconds, so the last observed value is a strong predictor and the
+learned model pays for its variance. Second, absolute RTT NMSE remains high
+(0.81): end-to-end RTT includes edge-server and backhaul contributions and
+bursty spikes that one-second KPI history plus GPS context cannot fully
+explain. Neither number is hidden: the aggregate manifest preserves per-seed
+raw metrics and environment metadata, and the aggregate table is generated
+from the committed per-seed JSON without manual transcription.
+
+This stage establishes that the ingestion, masking, splitting, and
+multi-step-forecast machinery survives contact with real, noisy, partly
+missing measurement data, and it calibrates expectations for which KPIs are
+learnable from vehicle-side context alone. It does not evaluate the language,
+intent, or action-conditioned components of MR-NWM, because the campaign
+provides no control log; action-conditioned evaluation remains on the
+synthetic protocol of Section~\ref{sec:protocol} and, prospectively, on
+datasets with synchronized control records.
+
+\begin{table*}[t]
+\centering
+\caption{UC6 real-measurement Stage-A forecast quality over a 4-second horizon
+on chronologically later, segment-isolated test sessions. Skill is
+$1-\mathrm{NMSE}_{\text{model}}/\mathrm{NMSE}_{\text{persistence}}$; positive
+is better. Values are mean $\pm$ sample standard deviation over three
+initialization seeds; persistence has zero variance by construction. MAE is in
+physical units.}
+\label{tab:uc6}
+\input{uc6_results.tex}
+\end{table*}
+
+\subsection{Second Campaign: UCC 5G Production Drive Tests}
+\label{sec:ucc5g}
+To check that the Stage-A conclusions are not specific to one campaign, we
+repeat the protocol on an independent public dataset: the UCC 5G production
+dataset~\cite{ucc5gdataset} (github.com/uccmisl/5Gdataset, GPL-3.0), recorded
+on a commercial 5G/LTE network in Cork, Ireland, one operator, with 83
+one-second session logs totaling 188{,}711 rows: downlink/uplink bitrate,
+RSRP, RSRQ, SNR, CQI, GPS position, speed, and ping (ping is populated in
+21 of 83 files only, so it is excluded from the forecast targets). As with
+UC6, the campaign contains no control-action log, so this remains
+observation forecasting.
+
+Each CSV file is one measurement session; sessions are segmented into
+trajectories with the same 60~s gap / 250~m jump rule, and the split is by
+whole session file in chronological order (70/15/15\% of the 83 sessions),
+so overlapping windows never cross the train/evaluation boundary and test
+windows come from physically later drive sessions. Windows use 8~s history
+and 4~s horizon on the native one-second grid. Normalization statistics are
+fit on training windows only. This yields 115{,}367 training, 44{,}396
+validation, and 27{,}912 test windows over 94 usable trajectory segments.
+Targets are DL bitrate (kbps), RSRP (dBm), RSRQ (dB), and SNR (dB); missing
+targets are masked out of the loss and metrics.
+
+The forecaster, optimizer, seeds, and persistence baseline are identical to
+the UC6 stage. Table~\ref{tab:ucc5g} reports mean $\pm$ sample standard
+deviation across the three seeds. The learned forecaster reduces NMSE
+relative to persistence by 11\% on DL bitrate, 13\% on RSRQ, and 9\% on SNR.
+RSRP is again forecast worse than persistence (skill $-4.0$), and for the
+same structural reason: RSRP varies slowly over a few seconds, so the last
+observed value is an extremely strong predictor (persistence NMSE
+$8\times10^{-4}$) and any learned variance is penalized. DL bitrate MAE is
+large in absolute terms (about 32{,}200~kbps) because streaming sessions
+swing between idle and tens of Mbps within seconds; the NMSE ratio, not the
+absolute MAE, is the meaningful comparison. The cross-campaign replication
+of both the positive skills and the RSRP failure mode increases confidence
+that the Stage-A pipeline behavior is a property of the pipeline, not of one
+campaign's quirks.
+
+\begin{table*}[t]
+\centering
+\caption{UCC 5G real-measurement Stage-A forecast quality over a 4-second
+horizon on chronologically later, session-isolated test drives. Skill is
+$1-\mathrm{NMSE}_{\text{model}}/\mathrm{NMSE}_{\text{persistence}}$; positive
+is better. Values are mean $\pm$ sample standard deviation over three
+initialization seeds; persistence has zero variance by construction. MAE is
+in physical units.}
+\label{tab:ucc5g}
+\input{ucc5g_results.tex}
+\end{table*}
+
 \section{Deployment Contract and Further Validation}
 Both Python realizations separate one slow call from $K$ cached-packet fast calls, which
 allows later export of the fast subnetwork. No transport or asynchronous runtime
@@ -473,7 +600,13 @@ coverage, and templated language make it useful for debugging but inadequate
 for ranking general-purpose 6G architectures. Three initialization seeds expose
 some optimization variation; because evaluation trajectories are shared, their
 sample standard deviation is not a confidence interval over deployment
-environments. The synthetic dynamics have no units or calibrated radio timing.
+environments. The real-data Stage-A checks of Section~\ref{sec:uc6} cover only
+observation forecasting on two vehicle/urban campaigns without a control log;
+their positive skill on most KPIs does not transfer automatically to
+action-conditioned prediction, and the replicated RSRP result shows that a
+learned forecaster can be worse than persistence when the target is locally
+constant.
+The synthetic dynamics have no units or calibrated radio timing.
 The recurrent state update is bounded but the whole predictor is not certified
 stable. A hard power filter provides only that specific actuator guarantee,
 not general reliability or safety.
@@ -490,12 +623,17 @@ RAN control beyond strong modular baselines---remains open.
 Source, fixed experiment commands, tests, raw metric and timing samples,
 source hashes, environment metadata, generated tables, and figure-generation
 code are available in the repository. The paper tables are generated directly
-from the committed result JSON. Trained toy checkpoints are preserved in the
-release project; their state dictionaries can be re-evaluated using the supplied
-script. Code is distributed under the included MIT license. The manuscript
-is a research preprint and makes no claim of peer review.
+from the committed result JSON. The UC6 and UCC~5G Stage-A tables are likewise
+generated from the committed per-seed result JSON files, including per-seed
+environment metadata for the NPU hosts. The public UC6 and UCC~5G datasets
+are not redistributed; the
+loaders verify their MD5, file, and row counts on download. Trained toy
+checkpoints are
+preserved in the release project; their state dictionaries can be re-evaluated
+using the supplied script. Code is distributed under the included MIT license.
+The manuscript is a research preprint and makes no claim of peer review.
 
-\begin{thebibliography}{11}
+\begin{thebibliography}{12}
 \bibitem{oran2026} ETSI, ``O-RAN Architecture Description,'' ETSI TS 103 982,
 V14.0.0, Mar. 2026, Secs. 5.2 and 5.3.2.
 \href{https://www.etsi.org/deliver/etsi_ts/103900_103999/103982/14.00.00_60/ts_103982v140000p.pdf}{ETSI specification}.
@@ -521,5 +659,12 @@ Images with One Multi-Modal Model,'' arXiv:2408.11039, 2024.
 Next-Generation Physical Layer Research,'' arXiv:2203.11854, 2022.
 \bibitem{qwen2024} Qwen Team, ``Qwen2.5-0.5B, pretrained base language model,
 2024. \url{https://huggingface.co/Qwen/Qwen2.5-0.5B}.
+\bibitem{uc6dataset} 5G-IANA Consortium, ``AI/ML-Annotated Wireless Datasets:
+Use Case 6 KPI measurement campaign (uc6.csv),'' Zenodo record 10037164,
+CC~BY~4.0, 2023. \url{https://zenodo.org/records/10037164}.
+\bibitem{ucc5gdataset} D. Raca, D. Leahy, C.~J. Sreenan, and J.~J. Quinlan,
+``Beyond Throughput, The Next Generation: A 5G Dataset with Channel and
+Context Metrics,'' ACM Multimedia Systems Conference (MMSys), 2020.
+Dataset: \url{https://github.com/uccmisl/5Gdataset} (GPL-3.0).
 \end{thebibliography}
 \end{document}

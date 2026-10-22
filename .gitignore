@@ -17,3 +17,6 @@ paper/*.blg
 paper/*.fls
 paper/*.fdb_latexmk
 paper/*.synctex.gz
+# Downloaded measurement datasets are not redistributed (paper Sec. 8):
+# loaders verify MD5/file/row counts on load instead.
+data/

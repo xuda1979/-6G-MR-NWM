@@ -1,6 +1,6 @@
 # MR-NWM 论文要点
 
-核对日期：2026-10-21；当前实现依据：[314d2db](https://github.com/xuda1979/-6G-MR-NWM/tree/314d2db)。实验结果沿用原始记录，不因文档更新改变。
+核对日期：2026-10-22（新增 UC6 与 UCC 5G 两项真实数据 Stage-A 结果）；当前实现依据：[314d2db](https://github.com/xuda1979/-6G-MR-NWM/tree/314d2db)。实验结果沿用原始记录，不因文档更新改变。
 
 **核心思路：以预训练语言模型作为慢速共享骨干，融合文本与连续观测，编译控制目标；再由轻量递归子网根据候选动作预测网络状态。** 当前有语言基座实现和轻量参考实现，两者的验证范围见下表。
 
@@ -75,7 +75,9 @@ FiLM、低秩参数化、多速率递归及专家混合已有研究基础。现�
 | 实现 | 当前证据 | 结论范围 |
 |---|---|---|
 | 语言基座 `LanguageBasedWorldModel` | 已记录 Qwen2.5-0.5B 的 CSI/IQ/拓扑接入、冻结骨干下适配器梯度及偏好不变性检查 | 适配器与无线预测头尚未完成任务训练；暂无无线预测性能结论 |
-| 轻量参考 `MultiRateNestedWorldModel` | 自建双链路队列／干扰模拟器；8 个变体、3 个初始化种子、每个可训练模型 300 次更新 | 论文性能表仅对应此实现与合成数据；仓库未提供真实无线测量数据 |
+| 轻量参考 `MultiRateNestedWorldModel` | 自建双链路队列／干扰模拟器；8 个变体、3 个初始化种子、每个可训练模型 300 次更新 | 论文主性能表仅对应此实现与合成数据 |
+| 真实数据 Stage-A（UC6） | 5G-IANA UC6 实测 26,733 秒级记录；LSTM 观测预测（19,344 参数），3 种子，NPU 训练 | 吞吐/RTT/RSRQ 相对持久性 NMSE 降 31–43%；RSRP 差于持久性（近恒定目标）。无动作日志，仅观测预测 |
+| 真实数据 Stage-A（UCC 5G） | UCC 5G 商用网路测 83 会话、188,711 秒级记录；同一 LSTM 协议，3 种子，CPU 训练 | DL bitrate/RSRQ/SNR 相对持久性 NMSE 降 9–13%；RSRP 复现 UC6 失败模式（skill −4.0）。跨数据集复现管线行为 |
 
 参考实验的信号能量归一化均方误差（NMSE，dB，越低越好）如下；数值为三种子的均值 ± 样本标准差。同分布（IID）与分布外（OOD）使用同一套评测协议。
 
@@ -95,14 +97,14 @@ FiLM、低秩参数化、多速率递归及专家混合已有研究基础。现�
 |---|---|
 | [DeepSense 6G](https://www.deepsense6g.net/) | 真实多模态无线/感知；适配器、波束/遮挡预测；按场景核对模态和非商业许可 |
 | [DICHASUS](https://dichasus.inue.uni-stuttgart.de/datasets/) | 实测 CSI＋位置/时间；信道表征、定位、连续轨迹预测；示例数据为 CC BY 4.0 |
-| [UCC 5Gdataset](https://github.com/uccmisl/5Gdataset) | 商用网秒级 KPI；只选 production ZIP，排除同仓库 ns-3 输出；数据许可另需复核 |
+| [UCC 5Gdataset](https://github.com/uccmisl/5Gdataset) | 商用网秒级 KPI；只选 production ZIP，排除同仓库 ns-3 输出；仓库 GPL-3.0，已核验无额外数据条款 |
 | [Lumos5G](https://networking.umn.edu/lumos5g) | 实测毫米波 5G 吞吐与上下文；官方公开下载，数据许可待复核 |
 | [5G-IANA UC6](https://zenodo.org/records/10037164) | 实测吞吐、RTT、无线 KPI；CC BY 4.0；已下载核对，含缺失值、重复时间与异常位置 |
 | [5G-IANA Nokia 路测](https://zenodo.org/records/12664724) | 实测位置/吞吐/PING KML；CC BY 4.0；已核对字段，三份文件为同组数据的展示副本，需去重且处理缺失 PING |
 | [Telecom Italia Milan](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/EGZHFV) | 真实 10 分钟聚合业务活动；慢尺度负载表征；ODbL，活动强度不等于比特率 |
 | [WiSig](https://cores.ee.ucla.edu/downloads/datasets/wisig/) | 实测 WiFi IQ；表征预训练/射频指纹；CC BY-NC-SA 4.0，包级标签不构成蜂窝动力学轨迹 |
 
-优先用 UC6 跑通真实 KPI 预测，再接 DICHASUS 与 DeepSense 的连续/多模态训练。需按数据字段调整状态定义、任务头和损失；这些数据尚未接入仓库。完整动作条件模型仍需有时间对齐的真实动作与后续状态日志。不同数据集可分任务训练，不能拼成虚假的同步轨迹。可选 flow matching 概率头未用于现有基准，其概率校准收益仍待评估。
+UC6 与 UCC 5G 的 Stage-A 观测预测已于 2026-10-22 接入并训练（见[真实数据集详表](REAL_DATASETS_CN.md)的“D5/D3 接入结果”、`results/uc6_stage_a/` 与 `results/ucc5g_stage_a/`）。下一步再接 DICHASUS 与 DeepSense 的连续/多模态训练。需按数据字段调整状态定义、任务头和损失；其余数据尚未接入仓库。完整动作条件模型仍需有时间对齐的真实动作与后续状态日志。不同数据集可分任务训练，不能拼成虚假的同步轨迹。可选 flow matching 概率头未用于现有基准，其概率校准收益仍待评估。
 
 ## 6. 来源与维护
 

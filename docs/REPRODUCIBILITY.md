@@ -1,12 +1,20 @@
 # Reproduction protocol
 
-## Two distinct validation records
+## Three distinct validation records
 
 `results/metrics.json` records the small-network synthetic benchmark below.
 `results/pretrained_integration.json` records the separately executed Qwen2.5-0.5B
 checkpoint integration, with resolved model revision and source hashes. The latter
 checks interfaces, numeric-adapter gradients through a frozen pretrained trunk,
 and preference invariance; it does not report trained RAN performance.
+`results/uc6_stage_a/` records the real-measurement UC6 Stage-A run
+(protocol `uc6-stage-a-v1`): per-seed result JSON files executed on Ascend 910B
+NPU hosts, the aggregate `uc6_stage_a_results.json` derived without manual
+transcription, and per-seed environment metadata. It is observation
+forecasting only; the campaign has no control-action log.
+`results/ucc5g_stage_a/` records the second real-measurement campaign
+(UCC 5G production drive tests, protocol `ucc5g-stage-a-v1`) with the same
+aggregate-from-per-seed discipline.
 
 ## Reference experiment
 
@@ -58,6 +66,47 @@ make reproduce
 python scripts/summarize.py runs/reference/metrics.json
 make paper
 ```
+
+## UC6 Stage-A (real measurement data)
+
+Download `uc6.csv` from Zenodo record 10037164 (CC BY 4.0) into
+`data/uc6/`; the loader verifies MD5
+`f8047eb5a2d57a5f789363b0c93757e5` and 26,733 rows on load. Then:
+
+```bash
+python scripts/train_uc6.py --steps 2000 --seeds 11 22 33 --device cpu \
+  --output runs/uc6/uc6_results.json
+```
+
+The committed evidence in `results/uc6_stage_a/` was produced on Ascend 910B
+NPU hosts (`--device npu`), one seed per invocation, seeds 11/22/33. Test
+metrics are computed on chronologically later, whole-session-isolated
+segments; normalization fits training segments only. CPU runs are
+equivalent for the protocol; only wall-clock differs (~21 s per seed on the
+NPU host).
+
+## UCC 5G Stage-A (second real measurement campaign)
+
+Download `5G-production-dataset.zip` from
+github.com/uccmisl/5Gdataset (GPL-3.0; codeload archive mirror works when
+raw.githubusercontent is blocked), extract under `data/ucc5g/`; the loader
+verifies 83 CSV files and 188,711 total rows on load. Then (run once per
+seed to mirror the committed evidence layout):
+
+```bash
+python scripts/train_ucc5g.py --steps 2000 --seeds 11 --device cpu \
+  --output runs/ucc5g/box_runs/seed11_ucc5g
+```
+
+`results/ucc5g_stage_a/` records this run (protocol `ucc5g-stage-a-v1`):
+per-seed results aggregated without manual transcription, plus environment
+metadata. Splits are by whole session file in chronological order
+(70/15/15% of 83 sessions); normalization fits training windows only. The
+committed evidence was produced on CPU (~3.5 s per seed). Targets: DL
+bitrate, RSRP, RSRQ, SNR; ping is excluded (populated in 21 of 83 files
+only). As with UC6, this is observation forecasting; the campaign has no
+control-action log.
+
 
 `make reproduce` writes to ignored `runs/reference/` so the committed evidence
 stays intact. To regenerate the reference report, run `make report`.

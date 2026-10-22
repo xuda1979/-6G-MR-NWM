@@ -125,7 +125,10 @@ $$
 # 已构造 model / inputs / initial / actions / context。
 # 每个宏窗口 5 步，动作长度必须为 5 的正整数倍。
 trajectory = model.rollout(
-    inputs, initial, actions, context,
+    inputs,
+    initial,
+    actions,
+    context,
     macro_period_seconds=0.1,
 )
 ```
