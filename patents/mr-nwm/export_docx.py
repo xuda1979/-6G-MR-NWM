@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Export the two patent sources with the future-code native Word templates."""
+"""Export one patent source using the future-code native Word template."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import math
 import re
 import zipfile
 from copy import deepcopy
@@ -18,14 +17,23 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.table import Table
 from docx.text.paragraph import Paragraph
-from PIL import Image, ImageDraw, ImageFont
+from disclosure_figures import CAPTIONS, diagram
 
 HERE = Path(__file__).resolve().parent
 STEMS = ("INVENTION_DISCLOSURE_CN", "PRIOR_ART_SEARCH_CN")
-TITLE = "一种多模态多速率无线网络世界模型控制方法"
+# The native OMML renderer below supports these exact source expressions.
+# Refuse silently stale equations if the Markdown source is edited.
+EQUATIONS = (
+    r"$$u_t=\gamma\odot\operatorname{SiLU}(W_x[s_t;a_t;c]+b_x)+\beta$$",
+    r"$$y_t=G_\theta(u_t,m_t)+\operatorname{Norm}(u_t)AB^\mathsf{T}/\sqrt{r}$$",
+    r"$$s_{t+1}=s_t+W_\delta y_t+b_\delta$$",
+)
+TITLE = "一种无线接入网多时间尺度数据协同处理与资源控制方法及装置"
+LEGACY_TITLE = "一种多模态多速率无线网络世界模型控制方法"
 FORMAT_PARTS = (
     "word/styles.xml",
     "word/theme/theme1.xml",
@@ -38,11 +46,6 @@ FORMAT_HASHES = {
     "disclosure.docx": "eb92d21e7858dc1e94323e44224e607d48cb5b82",
     "search.docx": "295ca826e2467a181b12b735b521ebbbd77c4a9c",
 }
-CAPTIONS = (
-    "图1 共享语言主干双视图与缓存快层的数据流",
-    "图2 连续窗口中的终态与摘要反馈",
-    "图3 固定物理输入时的偏好干预与候选评分",
-)
 
 
 def font_file(value=None):
@@ -60,110 +63,13 @@ def font_file(value=None):
     raise SystemExit("Pass --font-file with a Chinese font for the diagrams.")
 
 
-def diagram(index, font):
-    """Deterministic, black-and-white technical drawings; no generated imagery."""
-    directory = HERE / "figures"
-    directory.mkdir(exist_ok=True)
-    size = (1800, 630 if index == 1 else 430)
-    canvas = Image.new("RGB", size, "white")
-    draw = ImageDraw.Draw(canvas)
-    regular = ImageFont.truetype(str(font), 43)
-    small = ImageFont.truetype(str(font), 35)
-
-    def box(rect, words, gray=False):
-        draw.rectangle(rect, fill="#f2f2f2" if gray else "white", outline="black", width=4)
-        x1, y1, x2, y2 = rect
-        lines = words.split("\n")
-        y = (y1 + y2) / 2 - len(lines) * 55 / 2
-        for line in lines:
-            width = draw.textbbox((0, 0), line, font=regular)[2]
-            draw.text(((x1 + x2 - width) / 2, y), line, font=regular, fill="black")
-            y += 55
-
-    def arrow(points):
-        draw.line(points, fill="black", width=4, joint="curve")
-        x0, y0 = points[-2]
-        x, y = points[-1]
-        angle = math.atan2(y - y0, x - x0)
-        head = [
-            (x, y),
-            (x - 18 * math.cos(angle - 0.45), y - 18 * math.sin(angle - 0.45)),
-            (x - 18 * math.cos(angle + 0.45), y - 18 * math.sin(angle + 0.45)),
-        ]
-        draw.polygon(head, fill="black")
-
-    if index == 1:
-        box((25, 45, 395, 190), "连续观测\n状态与外生条件")
-        box((25, 360, 395, 470), "运营偏好文字")
-        draw.rectangle((470, 20, 890, 515), outline="black", width=4)
-        draw.text((500, 35), "共享预训练语言主干", font=small, fill="black")
-        box((495, 120, 865, 230), "独立物理视图", True)
-        box((495, 350, 865, 460), "独立语义视图", True)
-        box((975, 70, 1360, 215), "物理上下文\n缓存调制参数包")
-        box((1435, 70, 1770, 215), "快层递推\n状态与记忆")
-        box((975, 355, 1360, 465), "目标权重")
-        box((1435, 355, 1770, 500), "预测指标\n候选配置评分")
-        arrow([(395, 115), (450, 115), (450, 175), (495, 175)])
-        arrow([(395, 150), (425, 150), (425, 300), (675, 300), (675, 350)])
-        arrow([(395, 415), (495, 415)])
-        arrow([(865, 175), (920, 175), (920, 140), (975, 140)])
-        arrow([(1360, 140), (1435, 140)])
-        arrow([(865, 405), (975, 405)])
-        arrow([(1360, 410), (1435, 410)])
-        arrow([(1770, 140), (1790, 140), (1790, 420), (1770, 420)])
-        box((1450, 255, 1770, 330), "候选动作")
-        arrow([(1610, 255), (1610, 215)])
-        draw.text(
-            (60, 555),
-            "窗口摘要与终态反馈至下一窗口物理输入；偏好不进入物理视图",
-            font=small,
-            fill="black",
-        )
-    elif index == 2:
-        for y, labels in [
-            (
-                30,
-                [
-                    "窗口T输入\n状态与上窗摘要",
-                    "慢层更新\n生成参数包",
-                    "缓存包执行K步\n得到终态与摘要",
-                ],
-            ),
-            (
-                270,
-                [
-                    "窗口T+1输入\n承接终态与摘要",
-                    "慢层重新更新\n生成新参数包",
-                    "继续K步\n状态自由推进",
-                ],
-            ),
-        ]:
-            for x, label in zip([35, 660, 1285], labels):
-                box((x, y, x + 480, y + 135), label)
-            arrow([(515, y + 67), (660, y + 67)])
-            arrow([(1140, y + 67), (1285, y + 67)])
-        arrow([(1525, 165), (1525, 235), (275, 235), (275, 270)])
-        draw.text((590, 170), "窗口内不调用语言主干", font=small, fill="black")
-    else:
-        box((25, 30, 525, 155), "固定物理输入\n状态  动作  外生条件")
-        box((660, 30, 1140, 155), "物理视图与参数包\n保持同一预测")
-        box((1275, 30, 1775, 155), "同一候选配置\n预测指标保持一致")
-        box((25, 275, 525, 400), "偏好文字替换\n吞吐优先或能耗优先")
-        box((660, 275, 1140, 400), "语义视图\n目标权重可改变")
-        box((1275, 275, 1775, 400), "候选配置重新评分\n推荐动作可以变化")
-        for y in [92, 337]:
-            arrow([(525, y), (660, y)])
-            arrow([(1140, y), (1275, y)])
-        arrow([(1525, 155), (1525, 275)])
-        draw.text((35, 192), "不变性以动作固定且偏好未混入外生输入为前提", font=small, fill="black")
-    target = directory / f"figure_{index}.png"
-    canvas.save(target, dpi=(300, 300), optimize=True)
-    return target
-
-
 def add_link(p, url):
     url = url.rstrip("。，；、.,;")
-    if "/patent/" in url:
+    if "3gpp.org/news-events/3gpp-news/ai-ml-2025" in url:
+        label = "3GPP AI/ML技术介绍"
+    elif "3gpp.org/3gpp-groups/radio-access-networks-ran" in url:
+        label = "3GPP RAN职责"
+    elif "/patent/" in url:
         label = re.search(r"/patent/([^/]+)", url).group(1) + " 文献页"
     elif "/abs/" in url:
         label = "arXiv " + url.rsplit("/", 1)[1]
@@ -297,6 +203,7 @@ def equation(paragraph, index):
         expr.append(n)
     paragraph._p.append(container)
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.line_spacing = 1
 
 
 class Native:
@@ -326,9 +233,74 @@ class Native:
         self.append(element)
         p = Paragraph(element, self.doc._body)
         inline(p, value)
+        if self.path.name == "disclosure.docx":
+            size = {"Title": 24, "Heading 1": 16, "Heading 2": 13,
+                    "Heading 3": 11.5, "Image Caption": 10}.get(style, 11)
+            p.paragraph_format.line_spacing = Pt(size + 4.5)
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(5)
+            if style.startswith("Heading"):
+                p.paragraph_format.space_before = Pt(8)
+                p.paragraph_format.keep_with_next = True
+            for run in p.runs:
+                run.font.name = "Noto Sans CJK SC"
+                run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Noto Sans CJK SC")
+                run.font.size = Pt(size)
+                run.font.color.rgb = RGBColor(0, 0, 0)
+                if style.startswith("Heading"):
+                    run.bold = True
         return p
 
     def table(self, index, rows):
+        if self.path.name != "disclosure.docx":
+            return self.legacy_table(index, rows)
+        widths = [2100, 7260] if len(rows[0]) == 2 else [1800, 4800, 2760]
+        assert len(widths) == len(rows[0]), "Unsupported disclosure table schema"
+        table = self.doc.add_table(rows=0, cols=len(widths))
+        table.autofit = False
+        for col, width in zip(table.columns, widths):
+            col.width = Inches(width / 1440)
+        borders = OxmlElement("w:tblBorders")
+        for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            el = OxmlElement("w:" + side)
+            for key, value in {"val": "single", "sz": "4", "color": "D9D9D9"}.items():
+                el.set(qn("w:" + key), value)
+            borders.append(el)
+        table._tbl.tblPr.append(borders)
+        for i, record in enumerate(rows):
+            row = table.add_row()
+            props = row._tr.get_or_add_trPr()
+            props.append(OxmlElement("w:cantSplit"))
+            if i == 0:
+                props.append(OxmlElement("w:tblHeader"))
+            for cell, value, width in zip(row.cells, record, widths):
+                cell.width = Inches(width / 1440)
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                tcpr = cell._tc.get_or_add_tcPr()
+                margin = OxmlElement("w:tcMar")
+                for side in ("top", "left", "bottom", "right"):
+                    el = OxmlElement("w:" + side)
+                    el.set(qn("w:w"), "40" if side in ("top", "bottom") else "90")
+                    el.set(qn("w:type"), "dxa")
+                    margin.append(el)
+                tcpr.append(margin)
+                if i == 0:
+                    fill = OxmlElement("w:shd")
+                    fill.set(qn("w:fill"), "E6E6E6")
+                    tcpr.append(fill)
+                p = cell.paragraphs[0]
+                inline(p, value)
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.line_spacing = Pt(13)
+                p.paragraph_format.space_before = Pt(0)
+                for run in p.runs:
+                    run.font.name = "Noto Sans CJK SC"
+                    run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Noto Sans CJK SC")
+                    run.font.size = Pt(10)
+                    run.font.color.rgb = RGBColor(0, 0, 0)
+                    run.bold = i == 0
+
+    def legacy_table(self, index, rows):
         element = deepcopy(self.tables[index])
         table = Table(element, self.doc._body)
         assert len(table.columns) == len(rows[0])
@@ -385,8 +357,14 @@ class Native:
             p.add_run("多模态多速率无线网络世界模型控制")
         else:
             p.add_run(TITLE)
+        if not search:
+            for run in p.runs:
+                run.font.name = "Noto Sans CJK SC"
+                run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Noto Sans CJK SC")
+                run.font.size = Pt(22)
+                run.font.color.rgb = RGBColor(0, 0, 0)
         self.paragraph("Author", "中国移动通信有限公司研究院")
-        self.paragraph("Date", "2026-10-16")
+        self.paragraph("Date", "2026-10-16" if search else "2026-10-22")
         p = self.doc.add_paragraph("目录")
         p.paragraph_format.space_before = Pt(15)
         p.paragraph_format.space_after = Pt(6)
@@ -437,13 +415,15 @@ def export(stem, font, toc):
             i += 1
             figure_count += 1
             p = native.paragraph("Captioned Figure")
-            pic = p.add_run().add_picture(str(diagram(figure_count, font)), width=Inches(5.5))
+            p.paragraph_format.line_spacing = 1
+            pic = p.add_run().add_picture(str(diagram(figure_count, font)), width=Inches(6.3))
             pic._inline.docPr.set("descr", CAPTIONS[figure_count - 1])
             p.paragraph_format.keep_with_next = True
             caption = native.paragraph("Image Caption", CAPTIONS[figure_count - 1])
             caption.paragraph_format.keep_with_next = False
             continue
         if line.startswith("$$"):
+            assert line == EQUATIONS[equation_count], "Update native equation renderer for changed source"
             p = native.paragraph("First Paragraph")
             equation(p, equation_count)
             equation_count += 1
@@ -466,23 +446,36 @@ def export(stem, font, toc):
         match = re.fullmatch(r"(#{1,3})\s+(.+)", line)
         if match:
             style = f"Heading {len(match.group(1))}"
-            native.paragraph(style, match.group(2))
+            paragraph = native.paragraph(style, match.group(2))
+            if not search and match.group(2) in ("实施例 3 信息交换与6G标准化适配", "权利要求书"):
+                paragraph.paragraph_format.page_break_before = True
             headings.append(style)
             first = True
             continue
-        native.paragraph("First Paragraph" if first else "Body Text", line)
+        paragraph = native.paragraph("First Paragraph" if first else "Body Text", line)
+        if not search and re.match(r"^\d+\.", line):
+            paragraph.paragraph_format.keep_together = True
         first = False
-    assert headings == native.heading_sequence, "Heading levels/order differ from native template"
+    if search:
+        assert headings == native.heading_sequence, "Heading levels/order differ from native template"
+    else:
+        expected_roots = ["发明名称", "申请人信息", "发明人信息", "技术领域", "背景技术", "发明内容", "附图说明", "具体实施方式", "技术效果", "权利要求书", "说明书摘要"]
+        assert roots == expected_roots, "Root sections/order differ from native template"
     assert table_count == len(native.tables)
-    assert figure_count == (0 if search else 3)
+    assert figure_count == (0 if search else 5)
     assert equation_count == (0 if search else 3)
     props = native.doc.core_properties
     props.author = props.last_modified_by = ""
     props.title = "现有技术检索报告" if search else "发明专利技术交底书"
-    props.subject = TITLE
+    props.subject = LEGACY_TITLE if search else TITLE
     props.comments = ""
-    props.created = props.modified = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    props.created = props.modified = datetime(2026, 10, 16 if search else 22, tzinfo=timezone.utc)
     section = native.doc.sections[0]
+    if not search:
+        section.page_width, section.page_height = Inches(8.5), Inches(11)
+        section.top_margin = section.bottom_margin = Inches(0.72)
+        section.left_margin = section.right_margin = Inches(1)
+        section.footer_distance = Inches(0.3)
     p = section.footer.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for val in ["第 ", "PAGE", " 页"]:
@@ -503,12 +496,13 @@ def export(stem, font, toc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--font-file")
+    parser.add_argument("--only", choices=("disclosure", "search"), default="disclosure")
     parser.add_argument("--toc-map", type=Path)
     args = parser.parse_args()
     toc = json.loads(args.toc_map.read_text()) if args.toc_map else {}
     font = font_file(args.font_file)
-    for stem in STEMS:
-        print(export(stem, font, toc))
+    stem = STEMS[0 if args.only == "disclosure" else 1]
+    print(export(stem, font, toc))
 
 
 if __name__ == "__main__":
