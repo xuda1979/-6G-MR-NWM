@@ -12,16 +12,16 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
+from disclosure_figures import CAPTIONS, diagram
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.table import Table
 from docx.text.paragraph import Paragraph
-from disclosure_figures import CAPTIONS, diagram
 
 HERE = Path(__file__).resolve().parent
 STEMS = ("INVENTION_DISCLOSURE_CN", "PRIOR_ART_SEARCH_CN")
@@ -234,8 +234,13 @@ class Native:
         p = Paragraph(element, self.doc._body)
         inline(p, value)
         if self.path.name == "disclosure.docx":
-            size = {"Title": 24, "Heading 1": 16, "Heading 2": 13,
-                    "Heading 3": 11.5, "Image Caption": 10}.get(style, 11)
+            size = {
+                "Title": 24,
+                "Heading 1": 16,
+                "Heading 2": 13,
+                "Heading 3": 11.5,
+                "Image Caption": 10,
+            }.get(style, 11)
             p.paragraph_format.line_spacing = Pt(size + 4.5)
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(5)
@@ -423,7 +428,9 @@ def export(stem, font, toc):
             caption.paragraph_format.keep_with_next = False
             continue
         if line.startswith("$$"):
-            assert line == EQUATIONS[equation_count], "Update native equation renderer for changed source"
+            assert line == EQUATIONS[equation_count], (
+                "Update native equation renderer for changed source"
+            )
             p = native.paragraph("First Paragraph")
             equation(p, equation_count)
             equation_count += 1
@@ -457,9 +464,23 @@ def export(stem, font, toc):
             paragraph.paragraph_format.keep_together = True
         first = False
     if search:
-        assert headings == native.heading_sequence, "Heading levels/order differ from native template"
+        assert headings == native.heading_sequence, (
+            "Heading levels/order differ from native template"
+        )
     else:
-        expected_roots = ["发明名称", "申请人信息", "发明人信息", "技术领域", "背景技术", "发明内容", "附图说明", "具体实施方式", "技术效果", "权利要求书", "说明书摘要"]
+        expected_roots = [
+            "发明名称",
+            "申请人信息",
+            "发明人信息",
+            "技术领域",
+            "背景技术",
+            "发明内容",
+            "附图说明",
+            "具体实施方式",
+            "技术效果",
+            "权利要求书",
+            "说明书摘要",
+        ]
         assert roots == expected_roots, "Root sections/order differ from native template"
     assert table_count == len(native.tables)
     assert figure_count == (0 if search else 5)
