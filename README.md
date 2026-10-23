@@ -14,6 +14,7 @@ Authors are blank in the manuscript and PDF metadata.
 [Paper (PDF)](paper/main.pdf) · [LaTeX source](paper/main.tex) ·
 [中文论文要点（3–5 分钟）](docs/OVERVIEW_CN.md) ·
 [中文 Agentic RAN 技术报告](docs/AGENTIC_RAN_TECHNICAL_REPORT_CN.md) ·
+[中文进展报告](docs/PROGRESS_REPORT_CN_2026-10-23.md) ·
 [架构与多时间尺度详解](docs/ARCHITECTURE_CN.md) ·
 [公开免费真实数据集](docs/REAL_DATASETS_CN.md) ·
 [Measured results](results/SUMMARY.md) · [Review and corrections](docs/REVIEW.md) ·
@@ -22,17 +23,21 @@ Authors are blank in the manuscript and PDF metadata.
 
 ## Research status
 
-There are two explicit code paths:
+There are two world-model code paths, plus separate real-measurement Stage-A
+forecasting runs:
 
-| Path | Backbone | Evidence |
+| Path | Backbone / model | Evidence |
 |---|---|---|
 | `LanguageBasedWorldModel` in `foundation.py` | External pretrained language transformer and tokenizer | Multimodal, gradient, causality and API integration checks; no trained RAN performance claim |
 | `MultiRateNestedWorldModel` in `model.py` | Small randomly initialized attention/MLP mixture | Committed three-seed, eight-variant two-link synthetic benchmark |
+| UC6 and UCC 5G Stage-A runs | Separate 19,344-parameter LSTM forecasters | Three-seed, eight-second-history/four-second-horizon forecasts against persistence; both datasets lack control-action logs |
 
-The published benchmark numbers belong **only to the lightweight reference path**.
-No measured radio data or deployed RIC/DU is included. A pretrained text model
-still needs numeric-adapter alignment and wireless task training. Radio deadlines
-must be measured on the target system.
+The paper's original benchmark numbers belong **only to the synthetic lightweight
+reference path**. Separate Stage-A results on public 5G measurements are
+observation forecasts; they do not establish action-conditioned RAN control value.
+No deployed RIC/E2 integration or live radio-control loop is included. The
+pretrained language-model adapters and wireless heads still need task-aligned
+training. Radio deadlines must be measured on the target system.
 
 See [language-foundation inputs and timescales](docs/LANGUAGE_FOUNDATION.md).
 
